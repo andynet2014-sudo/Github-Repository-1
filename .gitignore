@@ -1,3 +1,4 @@
 data/collect.log
 __pycache__/
 *.pyc
+snapshot_*.xlsx
