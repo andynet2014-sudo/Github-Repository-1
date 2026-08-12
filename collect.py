@@ -120,6 +120,31 @@ def load_prices(positions, do_fetch, asof):
     return out, failed, rows
 
 
+def update_positions_current_price(prices):
+    """positions.csv 의 current_price_krw 열을 오늘 시세로 덮어쓴다.
+
+    사람이 입력한 나머지 칸(qty·avg_price_krw·손절가 등)은 그대로 두고
+    이 열만 갱신한다 — CSV 를 다시 읽어서 그대로 다시 쓰는 방식이라,
+    서식(콤마 표기 등)도 손대지 않는다.
+    """
+    path = os.path.join(DATA, 'positions.csv')
+    with open(path, encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames)
+        rows = list(reader)
+    if 'current_price_krw' not in fieldnames:
+        idx = fieldnames.index('avg_price_krw') + 1 if 'avg_price_krw' in fieldnames else len(fieldnames)
+        fieldnames = fieldnames[:idx] + ['current_price_krw'] + fieldnames[idx:]
+    for row in rows:
+        t = row['ticker']
+        if t in prices:
+            row['current_price_krw'] = '{:,.0f}'.format(prices[t][0])
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        w.writerows(rows)
+
+
 # ─────────────────────────── 리스크 엔진 ───────────────────────────
 
 def compute(positions, prices, accounts, common):
@@ -172,6 +197,13 @@ def compute(positions, prices, accounts, common):
     def div(a, b):
         return a / b if b else float('nan')
 
+    # 09_CF_원금 Ⅴ — 비용 차감 후 실질 손익 (이자는 참고만, 차감하지 않는다)
+    principal_total = num(common.get('principal_total', 0))
+    surface_pnl = equity - principal_total
+    course_fees = num(common.get('cum_course_fees', 0))
+    tax_est = num(common.get('cum_tax_est', 0))
+    net_pnl = surface_pnl - course_fees - tax_est
+
     m = {
         'nominal_sum': nominal_sum, 'expo_real': expo_real, 'cash': cash_sum,
         'total_val': total_val, 'credit': credit_sum, 'equity': equity,
@@ -193,6 +225,10 @@ def compute(positions, prices, accounts, common):
         'stop_loss_ratio': div(stop_loss, own),                         # B64
         'debt_to_salary': div(debt, salary),                            # B65
         'lev_etf_ratio': div(lev_etf_nominal, equity),                  # R07
+        'principal_total': principal_total, 'surface_pnl': surface_pnl,
+        'cum_interest': num(common.get('cum_interest', 0)),
+        'cum_course_fees': course_fees, 'cum_tax_est': tax_est,
+        'net_pnl': net_pnl, 'net_return': div(net_pnl, principal_total),
     }
     for acct in ('국장', '미장', 'ISA'):
         sub = [r for r in rows if r['account'] == acct]
@@ -271,6 +307,8 @@ def report(date, m, signals, failed):
     print('  현금 비중              %20s' % ('%.1f%%' % (m['cash_ratio'] * 100)))
     print('  최대 섹터              %20s   %s'
           % ('%.1f%%' % (m['max_sector'] * 100), m['max_sector_name']))
+    print('  실질 누적 순손익       %20s   표면 %s − 강의비·세금'
+          % ('{:,.0f}'.format(m['net_pnl']), '{:,.0f}'.format(m['surface_pnl'])))
     print()
     print('  %-8s %16s %16s' % ('계좌', '총평가', '순자산'))
     for a in ('국장', '미장', 'ISA'):
@@ -298,6 +336,7 @@ DAILY_COLS = ['date', 'equity', 'own_equity', 'expo_real', 'nominal_sum', 'cash'
               'margin_ratio', 'liq_room', 'cash_ratio', 'debt_ratio',
               'max_sector', 'max_sector_name', 'max_pos', 'stop_below',
               'stop_missing', 'stop_loss', 'stop_loss_ratio', 'debt_to_salary',
+              'surface_pnl', 'net_pnl', 'net_return',
               'violations', '국장_total', '국장_equity', '미장_equity', 'ISA_equity',
               'source']
 
@@ -399,8 +438,9 @@ def main():
         print('  (--dry: 저장하지 않았습니다)\n')
         return
     write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
+    update_positions_current_price(prices)
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache')
-    print('  기록 완료 → data/daily.csv, data/prices.csv\n')
+    print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가)\n')
 
 
 if __name__ == '__main__':
