@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """v2.4.5 스프레드시트에서 collect.py 가 쓸 씨앗 데이터를 1회 추출한다.
+원래 시트: 03_포지션 (초기 데이터 이관 전용, 1회성 부트스트랩 스크립트)
 
 한 번만 돌리면 되고, 이후로는 data/*.csv 만 관리하면 된다.
 사용법:  python3 seed_from_xlsx.py <v2.4.5.xlsx>
