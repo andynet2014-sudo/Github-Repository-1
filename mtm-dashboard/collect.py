@@ -82,11 +82,15 @@ def fetch_yahoo(symbol):
 
 
 def load_prices(positions, do_fetch, asof):
-    """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다."""
+    """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다.
+
+    sector == '현금' 행(예수금)은 시장 시세가 없다 — positions.csv 에 사람이 적어 둔
+    avg_price_krw(=잔액) 를 그대로 '가격'으로 쓴다. 조회도, 캐시 대체도 하지 않는다.
+    """
     cache = {r['ticker']: r for r in read_csv('prices.csv')}
     out, failed, fx = {}, [], None
 
-    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions):
+    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions if p['sector'] != '현금'):
         try:
             fx, _ = fetch_yahoo('USDKRW=X')
         except Exception as e:
@@ -98,6 +102,9 @@ def load_prices(positions, do_fetch, asof):
         if t in seen:
             continue
         seen.add(t)
+        if p['sector'] == '현금':
+            out[t] = (num(p['current_price_krw'] or p['avg_price_krw']), 'manual(현금)')
+            continue
         if do_fetch:
             try:
                 if p['quote_ccy'] == 'KRW':
@@ -149,16 +156,25 @@ def update_positions_current_price(prices):
 # ─────────────────────────── 리스크 엔진 ───────────────────────────
 
 def compute(positions, prices, accounts, common):
-    """v2.4.5 '④ 리스크 엔진' 과 같은 정의."""
-    rows = []
+    """v2.4.5 '④ 리스크 엔진' 과 같은 정의.
+
+    positions.csv 의 sector == '현금' 행은 예수금이다 — 주식이 아니므로 명목·실질
+    Exposure·섹터·손절 계산에서 전부 제외하고, 계좌별 잔액만 합산해 cash 로 쓴다.
+    (03_포지션 탭의 '① 계좌별 입력'이 하던 역할을 이제 positions.csv 행이 대신한다.)
+    """
+    all_rows = []
     for p in positions:
         price = prices[p['ticker']][0]
         qty, lev = num(p['qty']), int(num(p['lev'], 1))
         nominal = qty * price               # I열 평가금액(명목)
-        rows.append(dict(p, price=price, qty=qty, lev=lev,
-                         nominal=nominal, real=nominal * lev))   # J열 (실질)
+        all_rows.append(dict(p, price=price, qty=qty, lev=lev,
+                             nominal=nominal, real=nominal * lev))   # J열 (실질)
 
-    cash = {a['account']: num(a['cash']) for a in accounts}
+    rows = [r for r in all_rows if r['sector'] != '현금']
+    cash = {a['account']: 0.0 for a in accounts}
+    for r in all_rows:
+        if r['sector'] == '현금':
+            cash[r['account']] = cash.get(r['account'], 0.0) + r['nominal']
     credit = {a['account']: num(a['credit']) for a in accounts}
 
     nominal_sum = sum(r['nominal'] for r in rows)          # B36 주식평가(명목)
@@ -339,11 +355,13 @@ DAILY_COLS = ['date', 'equity', 'own_equity', 'expo_real', 'nominal_sum', 'cash'
               'stop_missing', 'stop_loss', 'stop_loss_ratio', 'debt_to_salary',
               'surface_pnl', 'net_pnl', 'net_return',
               'violations', '국장_total', '국장_equity', '미장_equity', 'ISA_equity',
-              'source']
+              'emotion', 'source']
 
 
-def upsert_daily(date, m, signals, source):
+def upsert_daily(date, m, signals, source, emotion=None):
+    existing = {r['date']: r for r in read_csv('daily.csv')}
     row = {'date': date, 'source': source,
+           'emotion': emotion if emotion is not None else existing.get(date, {}).get('emotion', ''),
            'violations': ','.join(s[0] for s in signals if s[4].startswith('🔴'))}
     for k in DAILY_COLS:
         if k in row:
@@ -416,6 +434,7 @@ def main():
     ap.add_argument('--dry', action='store_true', help='계산만, 저장 안 함')
     ap.add_argument('--no-fetch', action='store_true', help='시세 조회 없이 캐시 사용')
     ap.add_argument('--date', help='기록 날짜 (기본: 오늘)')
+    ap.add_argument('--emotion', help='오늘의 감정 태그 (예: 탐욕, 공포, 평온)')
     ap.add_argument('--backfill', metavar='XLSX', help='01_일별로그 과거 이력 복원')
     a = ap.parse_args()
 
@@ -440,7 +459,7 @@ def main():
         return
     write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
     update_positions_current_price(prices)
-    upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache')
+    upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
     print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가)\n')
 
 
