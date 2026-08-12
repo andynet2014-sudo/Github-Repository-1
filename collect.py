@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""리스크 대시보드 수집기 — 매일 입력을 0으로 만든다.
+
+사람이 만지는 파일은 두 개뿐이고, 둘 다 '거래한 날'에만 고치면 된다.
+  data/positions.csv   종목·수량·평단·손절가·섹터
+  data/accounts.csv    예수금·신용잔고
+
+나머지(prices/daily)는 이 스크립트가 쓴다.
+
+지표 정의는 260731_리스크관리대시보드_v2.4.5 의 '③ 포지션 ④ 리스크 엔진'과
+동일하다. 계산 위치만 스프레드시트에서 파이썬으로 옮긴 것이다.
+
+  python3 collect.py                 오늘자 수집·기록
+  python3 collect.py --dry           계산만 하고 저장하지 않음
+  python3 collect.py --no-fetch      시세 조회 없이 캐시로 재계산
+  python3 collect.py --date 2026-08-12
+  python3 collect.py --backfill v2.4.5.xlsx    01_일별로그 과거 이력 복원
+"""
+import argparse, csv, datetime, json, os, sys, urllib.request, urllib.error
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(BASE, 'data')
+UA = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+TIMEOUT = 10
+
+
+# ─────────────────────────── 입출력 ───────────────────────────
+
+def read_csv(name):
+    path = os.path.join(DATA, name)
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding='utf-8') as f:
+        return list(csv.DictReader(f))
+
+
+def write_csv(name, rows, cols):
+    with open(os.path.join(DATA, name), 'w', newline='', encoding='utf-8') as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def num(v, default=0.0):
+    try:
+        return float(str(v).replace(',', ''))
+    except (TypeError, ValueError):
+        return default
+
+
+# ─────────────────────────── 시세 ───────────────────────────
+
+def _get_json(url):
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return json.loads(r.read())
+
+
+def fetch_krx(code):
+    """네이버 우선, 실패하면 야후(.KS -> .KQ)."""
+    try:
+        d = _get_json('https://polling.finance.naver.com/api/realtime/domestic/stock/' + code)
+        item = d['datas'][0]
+        return float(str(item['closePrice']).replace(',', '')), 'naver'
+    except Exception:
+        pass
+    for suffix in ('.KS', '.KQ'):
+        try:
+            d = _get_json('https://query1.finance.yahoo.com/v8/finance/chart/'
+                          + code + suffix + '?range=1d&interval=1d')
+            return float(d['chart']['result'][0]['meta']['regularMarketPrice']), 'yahoo' + suffix
+        except Exception:
+            continue
+    raise RuntimeError('시세 조회 실패: ' + code)
+
+
+def fetch_yahoo(symbol):
+    d = _get_json('https://query1.finance.yahoo.com/v8/finance/chart/'
+                  + symbol + '?range=1d&interval=1d')
+    return float(d['chart']['result'][0]['meta']['regularMarketPrice']), 'yahoo'
+
+
+def load_prices(positions, do_fetch, asof):
+    """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다."""
+    cache = {r['ticker']: r for r in read_csv('prices.csv')}
+    out, failed, fx = {}, [], None
+
+    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions):
+        try:
+            fx, _ = fetch_yahoo('USDKRW=X')
+        except Exception as e:
+            failed.append(('USDKRW', str(e)[:60]))
+
+    seen = set()
+    for p in positions:
+        t = p['ticker']
+        if t in seen:
+            continue
+        seen.add(t)
+        if do_fetch:
+            try:
+                if p['quote_ccy'] == 'KRW':
+                    price, src = fetch_krx(p['quote_symbol'])
+                else:
+                    if fx is None:
+                        raise RuntimeError('환율 없음')
+                    usd, src = fetch_yahoo(p['quote_symbol'])
+                    price, src = usd * fx, '%s×FX%.1f' % (src, fx)
+                out[t] = (price, src)
+                continue
+            except Exception as e:
+                failed.append((t, str(e)[:60]))
+        if t in cache:
+            out[t] = (num(cache[t]['price_krw']), 'cache(%s)' % cache[t].get('asof', '?'))
+        else:
+            raise SystemExit('중단: %s 는 시세도 캐시도 없습니다.' % t)
+
+    rows = [{'ticker': t, 'price_krw': round(v[0], 4), 'asof': asof, 'source': v[1]}
+            for t, v in out.items()]
+    return out, failed, rows
+
+
+# ─────────────────────────── 리스크 엔진 ───────────────────────────
+
+def compute(positions, prices, accounts, common):
+    """v2.4.5 '④ 리스크 엔진' 과 같은 정의."""
+    rows = []
+    for p in positions:
+        price = prices[p['ticker']][0]
+        qty, lev = num(p['qty']), int(num(p['lev'], 1))
+        nominal = qty * price               # I열 평가금액(명목)
+        rows.append(dict(p, price=price, qty=qty, lev=lev,
+                         nominal=nominal, real=nominal * lev))   # J열 (실질)
+
+    cash = {a['account']: num(a['cash']) for a in accounts}
+    credit = {a['account']: num(a['credit']) for a in accounts}
+
+    nominal_sum = sum(r['nominal'] for r in rows)          # B36 주식평가(명목)
+    expo_real = sum(r['real'] for r in rows)               # B37 주식 Exposure(실질)
+    cash_sum = sum(cash.values())                          # B38 예수금 합계
+    total_val = nominal_sum + cash_sum                     # B39 총평가(명목)
+    credit_sum = sum(credit.values())                      # B40 증권사 신용
+    equity = total_val - credit_sum                        # B41 계좌 순자산
+    loan = num(common['company_loan'])                     # B42 회사대출
+    own = equity - loan                                    # B43 순수 자기자본
+    implied = sum(r['nominal'] * (r['lev'] - 1) for r in rows)   # B44 내재 레버리지
+    debt = credit_sum + implied                            # B45 총차입
+
+    kr = [r for r in rows if r['account'] == '국장']
+    kr_total = sum(r['nominal'] for r in kr) + cash.get('국장', 0)   # B46
+    kr_expo = sum(r['real'] for r in kr)                             # B47
+    kr_credit = credit.get('국장', 0)
+    mcr = num(common['margin_call_ratio'])
+
+    # 섹터 집계 — 실질 기준, 분모는 실질 합계
+    sector = {}
+    for r in rows:
+        sector[r['sector']] = sector.get(r['sector'], 0) + r['real']
+    top_sector, top_sector_val = max(sector.items(), key=lambda x: x[1]) if sector else ('', 0)
+
+    # 손절: 현재가가 손절가 위인 종목만 손실이 잡힌다 (아래면 이미 하회 → 0)
+    stop_missing = sum(1 for r in rows if r['stop_price_krw'] in ('', None))
+    stop_below = sum(1 for r in rows
+                     if r['stop_price_krw'] not in ('', None)
+                     and r['price'] < num(r['stop_price_krw']))
+    stop_loss = sum(max(0.0, (r['price'] - num(r['stop_price_krw'])) * r['qty'])
+                    for r in rows if r['stop_price_krw'] not in ('', None))
+
+    lev_etf_nominal = sum(r['nominal'] for r in rows if r['lev'] > 1)
+    salary = num(common['salary'])
+
+    def div(a, b):
+        return a / b if b else float('nan')
+
+    m = {
+        'nominal_sum': nominal_sum, 'expo_real': expo_real, 'cash': cash_sum,
+        'total_val': total_val, 'credit': credit_sum, 'equity': equity,
+        'loan': loan, 'own_equity': own, 'implied_lev': implied, 'debt': debt,
+        'kr_total': kr_total, 'kr_expo': kr_expo,
+        'margin_ratio': div(kr_total, kr_credit),                       # B51
+        'liq_room': div(kr_total - kr_credit * mcr, kr_expo),           # B52
+        'lev_account': div(expo_real, equity),                          # B53
+        'lev_real': div(expo_real, own),                                # B54
+        'debt_ratio': div(debt, expo_real),                             # B55
+        'cash_ratio': div(cash_sum, expo_real + cash_sum),              # B56
+        'n_positions': len(rows),                                       # B57
+        'max_pos': div(max((r['real'] for r in rows), default=0), nominal_sum),   # B58
+        'max_sector': div(top_sector_val, expo_real),                   # B59
+        'max_sector_name': top_sector,
+        'stop_missing': stop_missing, 'stop_below': stop_below,         # B60/B61
+        'n_credit': sum(1 for r in rows if r['uses_credit'] == 'Y'),    # B62
+        'stop_loss': stop_loss,                                         # B63
+        'stop_loss_ratio': div(stop_loss, own),                         # B64
+        'debt_to_salary': div(debt, salary),                            # B65
+        'lev_etf_ratio': div(lev_etf_nominal, equity),                  # R07
+    }
+    for acct in ('국장', '미장', 'ISA'):
+        sub = [r for r in rows if r['account'] == acct]
+        m[acct + '_total'] = sum(r['nominal'] for r in sub) + cash.get(acct, 0)
+        m[acct + '_equity'] = m[acct + '_total'] - credit.get(acct, 0)
+    return m, rows
+
+
+# ─────────────────────────── 신호등 ───────────────────────────
+# (지표키, 방향)  'max' = 기준 초과면 위반 / 'min' = 기준 미만이면 위반
+RULE_MAP = {
+    'R01': ('lev_real', 'max', '과레버리지'),
+    'R02': ('liq_room', 'min', '청산임박'),
+    'R03': ('cash_ratio', 'min', '현금고갈'),
+    'R04': ('stop_violations', 'max', '손절방치'),
+    'R05': ('stop_loss_ratio', 'max', '한방리스크'),
+    'R06': ('max_sector', 'max', '섹터쏠림'),
+    'R07': ('lev_etf_ratio', 'max', '레버ETF과다'),
+    'R08': ('debt_to_salary', 'max', '빚과다'),
+}
+# 시트 R07 은 기준값 칸이 비어 있어 항상 '준수'로 판정됩니다. 경고값(0.05)이
+# 상한으로 쓰기엔 지나치게 낮아, 계좌 순자산의 50%를 잠정 기준으로 둡니다.
+FALLBACK_THRESHOLD = {'R07': 0.5}
+
+
+def judge(metrics, rules):
+    metrics = dict(metrics)
+    metrics['stop_violations'] = metrics['stop_missing'] + metrics['stop_below']
+    out = []
+    for r in rules:
+        rid = r['id']
+        if rid not in RULE_MAP:
+            continue
+        key, direction, label = RULE_MAP[rid]
+        thr = num(r['threshold'], None) if r['threshold'] not in ('', None) else None
+        fallback = thr is None and rid in FALLBACK_THRESHOLD
+        if fallback:
+            thr = FALLBACK_THRESHOLD[rid]
+        if thr is None:
+            out.append((rid, label, metrics.get(key), None, '⚪ 측정불가', False))
+            continue
+        cur = metrics.get(key)
+        bad = cur > thr if direction == 'max' else cur < thr
+        out.append((rid, label, cur, thr, '🔴 위반' if bad else '🟢 준수', fallback))
+    return out
+
+
+# ─────────────────────────── 출력 ───────────────────────────
+
+PCT = {'liq_room', 'cash_ratio', 'max_sector', 'stop_loss_ratio', 'lev_etf_ratio'}
+MULT = {'lev_real', 'debt_to_salary'}
+
+
+def fmt(key, v):
+    if v is None:
+        return '—'
+    if key in PCT:
+        return '%.1f%%' % (v * 100)
+    if key in MULT:
+        return '%.2f배' % v
+    return '{:,.0f}'.format(v)
+
+
+def report(date, m, signals, failed):
+    W = 62
+    print('\n━━━ %s ' % date + '━' * (W - len(date) - 5))
+    print('  계좌 순자산 (Equity)   %20s' % '{:,.0f}'.format(m['equity']))
+    print('  순수 자기자본          %20s   ← 회사대출 차감' % '{:,.0f}'.format(m['own_equity']))
+    print('  실질 주식 Exposure     %20s' % '{:,.0f}'.format(m['expo_real']))
+    print('  총차입                 %20s   (신용 %s + 내재레버 %s)'
+          % ('{:,.0f}'.format(m['debt']), '{:,.0f}'.format(m['credit']),
+             '{:,.0f}'.format(m['implied_lev'])))
+    print('  실질 레버리지          %20s' % ('%.2f배' % m['lev_real']))
+    print('  청산까지 여력          %20s   담보비율 %.2f'
+          % ('%.1f%%' % (m['liq_room'] * 100), m['margin_ratio']))
+    print('  현금 비중              %20s' % ('%.1f%%' % (m['cash_ratio'] * 100)))
+    print('  최대 섹터              %20s   %s'
+          % ('%.1f%%' % (m['max_sector'] * 100), m['max_sector_name']))
+    print()
+    print('  %-8s %16s %16s' % ('계좌', '총평가', '순자산'))
+    for a in ('국장', '미장', 'ISA'):
+        print('  %-8s %16s %16s' % (a, '{:,.0f}'.format(m[a + '_total']),
+                                    '{:,.0f}'.format(m[a + '_equity'])))
+    print('\n━━━ 리스크 신호등 ' + '━' * (W - 18))
+    for rid, label, cur, thr, sig, fallback in signals:
+        key = RULE_MAP[rid][0]
+        note = '  ※ 기준값 미설정, 잠정 %s' % fmt(key, thr) if fallback else ''
+        print('  %-5s %-12s %10s  (기준 %8s)   %s%s'
+              % (rid, label, fmt(key, cur), fmt(key, thr) if thr is not None else '—', sig, note))
+    bad = sum(1 for s in signals if s[4].startswith('🔴'))
+    print('\n  위반 %d건 / %d건' % (bad, len(signals)))
+    if failed:
+        print('\n  ⚠ 시세 조회 실패 — 캐시로 대체했습니다:')
+        for t, e in failed:
+            print('     %-12s %s' % (t, e))
+    print()
+
+
+# ─────────────────────────── daily.csv ───────────────────────────
+
+DAILY_COLS = ['date', 'equity', 'own_equity', 'expo_real', 'nominal_sum', 'cash',
+              'credit', 'implied_lev', 'debt', 'lev_real', 'lev_account',
+              'margin_ratio', 'liq_room', 'cash_ratio', 'debt_ratio',
+              'max_sector', 'max_sector_name', 'max_pos', 'stop_below',
+              'stop_missing', 'stop_loss', 'stop_loss_ratio', 'debt_to_salary',
+              'violations', '국장_total', '국장_equity', '미장_equity', 'ISA_equity',
+              'source']
+
+
+def upsert_daily(date, m, signals, source):
+    row = {'date': date, 'source': source,
+           'violations': ','.join(s[0] for s in signals if s[4].startswith('🔴'))}
+    for k in DAILY_COLS:
+        if k in row:
+            continue
+        v = m.get(k)
+        if isinstance(v, float):
+            v = round(v, 6)
+        row[k] = '' if v is None else v
+    rows = [r for r in read_csv('daily.csv') if r['date'] != date]
+    rows.append(row)
+    rows.sort(key=lambda r: r['date'])
+    write_csv('daily.csv', rows, DAILY_COLS)
+    return row
+
+
+# ─────────────────────────── backfill ───────────────────────────
+
+def backfill(xlsx):
+    """01_일별로그의 과거 입력값을 daily.csv 로 복원.
+
+    2026-07-30 이전에는 미장·ISA 기록이 아예 없다. 그 구간에서 국장만 더한 값을
+    '전체 순자산'으로 적으면 추이가 조용히 틀리므로, 국장 값만 채우고 전체
+    지표는 비워 둔 뒤 source 로 구분한다.
+    """
+    import openpyxl
+    ws = openpyxl.load_workbook(xlsx, data_only=True)['01_일별로그']
+    existing = {r['date']: r for r in read_csv('daily.csv')}
+    added = 0
+    kinds = {}
+    for r in range(5, 1000):
+        d = ws.cell(r, 1).value
+        if not isinstance(d, datetime.datetime):
+            continue
+        date = d.strftime('%Y-%m-%d')
+        S, T = ws.cell(r, 19).value, ws.cell(r, 20).value      # 국장 총평가 / 순자산
+        U, V = ws.cell(r, 21).value, ws.cell(r, 22).value      # 미장 / ISA 순자산
+        if not any((S, T, U, V)) or date in existing:
+            continue
+        row = {c: '' for c in DAILY_COLS}
+        row['date'] = date
+        row['국장_total'] = S or ''
+        row['국장_equity'] = T or ''
+        row['미장_equity'] = U or ''
+        row['ISA_equity'] = V or ''
+        if T and U and V:
+            row['equity'] = num(T) + num(U) + num(V)
+            kind = 'backfill(전체)'
+        elif T and not (U or V):
+            kind = 'backfill(국장만)'          # 미장·ISA 기록이 아예 없던 구간
+        else:
+            kind = 'backfill(국장순자산 누락)'  # 미장·ISA 는 있는데 국장 순자산이 빈 행
+        row['source'] = kind
+        kinds[kind] = kinds.get(kind, 0) + 1
+        existing[date] = row
+        added += 1
+    rows = sorted(existing.values(), key=lambda x: x['date'])
+    write_csv('daily.csv', rows, DAILY_COLS)
+    print('복원 %d행 (daily.csv 총 %d행)' % (added, len(rows)))
+    for k, v in sorted(kinds.items()):
+        print('  %-26s %d행' % (k, v))
+    if kinds.get('backfill(전체)', 0) < added:
+        print('\n  ※ equity(전체 순자산)는 세 계좌가 모두 있는 행에만 채웠습니다.')
+        print('    나머지 행에 국장 값만 넣어 "전체 순자산"으로 그리면 추이가 조용히 틀립니다.')
+
+
+# ─────────────────────────── main ───────────────────────────
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--dry', action='store_true', help='계산만, 저장 안 함')
+    ap.add_argument('--no-fetch', action='store_true', help='시세 조회 없이 캐시 사용')
+    ap.add_argument('--date', help='기록 날짜 (기본: 오늘)')
+    ap.add_argument('--backfill', metavar='XLSX', help='01_일별로그 과거 이력 복원')
+    a = ap.parse_args()
+
+    if a.backfill:
+        return backfill(a.backfill)
+
+    date = a.date or datetime.date.today().isoformat()
+    positions = read_csv('positions.csv')
+    if not positions:
+        raise SystemExit('data/positions.csv 가 없습니다. seed_from_xlsx.py 를 먼저 돌리세요.')
+    accounts = read_csv('accounts.csv')
+    common = {r['key']: r['value'] for r in read_csv('common.csv')}
+    rules = read_csv('rules.csv')
+
+    prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)
+    m, _ = compute(positions, prices, accounts, common)
+    signals = judge(m, rules)
+    report(date, m, signals, failed)
+
+    if a.dry:
+        print('  (--dry: 저장하지 않았습니다)\n')
+        return
+    write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
+    upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache')
+    print('  기록 완료 → data/daily.csv, data/prices.csv\n')
+
+
+if __name__ == '__main__':
+    main()
