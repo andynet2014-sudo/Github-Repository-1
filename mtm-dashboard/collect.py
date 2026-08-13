@@ -242,6 +242,7 @@ def compute(positions, prices, accounts, common):
         'stop_loss_ratio': div(stop_loss, own),                         # B64
         'debt_to_salary': div(debt, salary),                            # B65
         'lev_etf_ratio': div(lev_etf_nominal, equity),                  # R07
+        'lev_etf_nominal': lev_etf_nominal,
         'principal_total': principal_total, 'surface_pnl': surface_pnl,
         'cum_interest': num(common.get('cum_interest', 0)),
         'cum_course_fees': course_fees, 'cum_tax_est': tax_est,
