@@ -46,10 +46,9 @@ def main(path):
     ws = openpyxl.load_workbook(path, data_only=True)['03_포지션']
 
     positions = collect.read_csv('positions.csv')
-    accounts = collect.read_csv('accounts.csv')
     common = {r['key']: r['value'] for r in collect.read_csv('common.csv')}
     prices, _, _ = collect.load_prices(positions, False, '')
-    mine, _ = collect.compute(positions, prices, accounts, common)
+    mine, _ = collect.compute(positions, prices, common)
 
     print('%-26s %18s %18s   %s' % ('지표', '스프레드시트', 'collect.py', '판정'))
     print('─' * 78)

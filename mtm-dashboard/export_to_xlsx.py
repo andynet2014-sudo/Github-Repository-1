@@ -42,11 +42,10 @@ def main():
     date = a.date or datetime.date.today().isoformat()
 
     positions = collect.read_csv('positions.csv')
-    accounts = collect.read_csv('accounts.csv')
     common = {r['key']: r['value'] for r in collect.read_csv('common.csv')}
     rules = collect.read_csv('rules.csv')
     prices, _, _ = collect.load_prices(positions, False, date)
-    m, _ = collect.compute(positions, prices, accounts, common)
+    m, _ = collect.compute(positions, prices, common)
     signals = collect.judge(m, rules)
 
     wb = openpyxl.Workbook()

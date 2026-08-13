@@ -84,13 +84,14 @@ def fetch_yahoo(symbol):
 def load_prices(positions, do_fetch, asof):
     """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다.
 
-    sector == '현금' 행(예수금)은 시장 시세가 없다 — positions.csv 에 사람이 적어 둔
+    sector == '현금'/'신용' 행은 시장 시세가 없다 — positions.csv 에 사람이 적어 둔
     avg_price_krw(=잔액) 를 그대로 '가격'으로 쓴다. 조회도, 캐시 대체도 하지 않는다.
     """
     cache = {r['ticker']: r for r in read_csv('prices.csv')}
     out, failed, fx = {}, [], None
+    NONMARKET = ('현금', '신용')
 
-    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions if p['sector'] != '현금'):
+    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions if p['sector'] not in NONMARKET):
         try:
             fx, _ = fetch_yahoo('USDKRW=X')
         except Exception as e:
@@ -102,8 +103,8 @@ def load_prices(positions, do_fetch, asof):
         if t in seen:
             continue
         seen.add(t)
-        if p['sector'] == '현금':
-            out[t] = (num(p['current_price_krw'] or p['avg_price_krw']), 'manual(현금)')
+        if p['sector'] in NONMARKET:
+            out[t] = (num(p['current_price_krw'] or p['avg_price_krw']), 'manual(%s)' % p['sector'])
             continue
         if do_fetch:
             try:
@@ -155,12 +156,16 @@ def update_positions_current_price(prices):
 
 # ─────────────────────────── 리스크 엔진 ───────────────────────────
 
-def compute(positions, prices, accounts, common):
+ACCOUNTS = ('국장', '미장', 'ISA')
+
+
+def compute(positions, prices, common):
     """v2.4.5 '④ 리스크 엔진' 과 같은 정의.
 
-    positions.csv 의 sector == '현금' 행은 예수금이다 — 주식이 아니므로 명목·실질
-    Exposure·섹터·손절 계산에서 전부 제외하고, 계좌별 잔액만 합산해 cash 로 쓴다.
-    (03_포지션 탭의 '① 계좌별 입력'이 하던 역할을 이제 positions.csv 행이 대신한다.)
+    positions.csv 의 sector == '현금'/'신용' 행은 주식이 아니다 — 명목·실질
+    Exposure·섹터·손절 계산에서 전부 제외하고, 계좌별로 cash/credit 에 합산한다.
+    (03_포지션 탭의 '① 계좌별 입력'이 하던 역할을 이제 positions.csv 행이 대신한다.
+    accounts.csv 는 삭제됐다 — 신용도 거래한 날 만지는 positions.csv 안에 있다.)
     """
     all_rows = []
     for p in positions:
@@ -170,12 +175,14 @@ def compute(positions, prices, accounts, common):
         all_rows.append(dict(p, price=price, qty=qty, lev=lev,
                              nominal=nominal, real=nominal * lev))   # J열 (실질)
 
-    rows = [r for r in all_rows if r['sector'] != '현금']
-    cash = {a['account']: 0.0 for a in accounts}
+    rows = [r for r in all_rows if r['sector'] not in ('현금', '신용')]
+    cash = {a: 0.0 for a in ACCOUNTS}
+    credit = {a: 0.0 for a in ACCOUNTS}
     for r in all_rows:
         if r['sector'] == '현금':
             cash[r['account']] = cash.get(r['account'], 0.0) + r['nominal']
-    credit = {a['account']: num(a['credit']) for a in accounts}
+        elif r['sector'] == '신용':
+            credit[r['account']] = credit.get(r['account'], 0.0) + r['nominal']
 
     nominal_sum = sum(r['nominal'] for r in rows)          # B36 주식평가(명목)
     expo_real = sum(r['real'] for r in rows)               # B37 주식 Exposure(실질)
@@ -392,8 +399,9 @@ def upsert_position_history(date, rows):
             if not (r['date'] == date)]
     for r in rows:
         avg = num(r['avg_price_krw'])
-        pnl = (r['price'] - avg) * r['qty'] if r['sector'] != '현금' else 0.0
-        pnl_pct = (r['price'] / avg - 1) if avg and r['sector'] != '현금' else 0.0
+        market = r['sector'] not in ('현금', '신용')
+        pnl = (r['price'] - avg) * r['qty'] if market else 0.0
+        pnl_pct = (r['price'] / avg - 1) if avg and market else 0.0
         keep.append({
             'date': date, 'ticker': r['ticker'], 'name': r['name'], 'account': r['account'],
             'sector': r['sector'], 'qty': r['qty'], 'lev': r['lev'],
@@ -485,12 +493,11 @@ def main():
     positions = read_csv('positions.csv')
     if not positions:
         raise SystemExit('data/positions.csv 가 없습니다. seed_from_xlsx.py 를 먼저 돌리세요.')
-    accounts = read_csv('accounts.csv')
     common = {r['key']: r['value'] for r in read_csv('common.csv')}
     rules = read_csv('rules.csv')
 
     prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)
-    m, stock_rows = compute(positions, prices, accounts, common)
+    m, stock_rows = compute(positions, prices, common)
     signals = judge(m, rules)
     report(date, m, signals, failed)
 
@@ -501,14 +508,15 @@ def main():
     update_positions_current_price(prices)
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
 
-    cash_rows = []
+    nonmarket_rows = []
     for p in positions:
-        if p['sector'] != '현금':
+        if p['sector'] not in ('현금', '신용'):
             continue
         price = prices[p['ticker']][0]
         qty = num(p['qty'])
-        cash_rows.append(dict(p, price=price, qty=qty, lev=1, nominal=qty * price, real=qty * price))
-    upsert_position_history(date, stock_rows + cash_rows)
+        nonmarket_rows.append(dict(p, price=price, qty=qty, lev=1,
+                                    nominal=qty * price, real=qty * price))
+    upsert_position_history(date, stock_rows + nonmarket_rows)
 
     print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
 
