@@ -378,6 +378,32 @@ def upsert_daily(date, m, signals, source, emotion=None):
     return row
 
 
+# ─────────────────────────── positions_history.csv ───────────────────────────
+# daily.csv 는 계좌 합계만 남긴다 — 종목별로 그날 얼마였는지는 여기 쌓인다.
+# positions.csv 는 최신 상태로 매번 덮어써지므로 그 자체로는 이력이 안 남는다.
+
+POSITION_HISTORY_COLS = ['date', 'ticker', 'name', 'account', 'sector', 'qty', 'lev',
+                          'avg_price_krw', 'price', 'nominal', 'real', 'pnl', 'pnl_pct']
+
+
+def upsert_position_history(date, rows):
+    """positions.csv 의 그날 스냅샷(종목별 가격·평가·손익)을 date+ticker+account 키로 쌓는다."""
+    keep = [r for r in read_csv('positions_history.csv')
+            if not (r['date'] == date)]
+    for r in rows:
+        avg = num(r['avg_price_krw'])
+        pnl = (r['price'] - avg) * r['qty'] if r['sector'] != '현금' else 0.0
+        pnl_pct = (r['price'] / avg - 1) if avg and r['sector'] != '현금' else 0.0
+        keep.append({
+            'date': date, 'ticker': r['ticker'], 'name': r['name'], 'account': r['account'],
+            'sector': r['sector'], 'qty': r['qty'], 'lev': r['lev'],
+            'avg_price_krw': avg, 'price': r['price'], 'nominal': r['nominal'], 'real': r['real'],
+            'pnl': round(pnl, 2), 'pnl_pct': round(pnl_pct, 6),
+        })
+    keep.sort(key=lambda r: (r['date'], r['account'], r['ticker']))
+    write_csv('positions_history.csv', keep, POSITION_HISTORY_COLS)
+
+
 # ─────────────────────────── backfill ───────────────────────────
 
 def backfill(xlsx):
@@ -464,7 +490,7 @@ def main():
     rules = read_csv('rules.csv')
 
     prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)
-    m, _ = compute(positions, prices, accounts, common)
+    m, stock_rows = compute(positions, prices, accounts, common)
     signals = judge(m, rules)
     report(date, m, signals, failed)
 
@@ -474,7 +500,17 @@ def main():
     write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
     update_positions_current_price(prices)
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
-    print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가)\n')
+
+    cash_rows = []
+    for p in positions:
+        if p['sector'] != '현금':
+            continue
+        price = prices[p['ticker']][0]
+        qty = num(p['qty'])
+        cash_rows.append(dict(p, price=price, qty=qty, lev=1, nominal=qty * price, real=qty * price))
+    upsert_position_history(date, stock_rows + cash_rows)
+
+    print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
 
 
 if __name__ == '__main__':
