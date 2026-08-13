@@ -386,6 +386,11 @@ def backfill(xlsx):
     2026-07-30 이전에는 미장·ISA 기록이 아예 없다. 그 구간에서 국장만 더한 값을
     '전체 순자산'으로 적으면 추이가 조용히 틀리므로, 국장 값만 채우고 전체
     지표는 비워 둔 뒤 source 로 구분한다.
+
+    S~V(일별 빠른입력, 19~22열)가 없는 날도 B열(순자산)·D열(누적손익)이 채워져
+    있으면 그걸로 채운다 — 매일은 아니어도 주기적으로 기록해 둔 과거 시점들이다.
+    누적손익(D열)은 시트 전체에서 '순자산 − 340,000,000(고정 원금)'으로 일관돼 있어
+    collect.py 의 surface_pnl 과 같은 정의다.
     """
     import openpyxl
     ws = openpyxl.load_workbook(xlsx, data_only=True)['01_일별로그']
@@ -397,9 +402,12 @@ def backfill(xlsx):
         if not isinstance(d, datetime.datetime):
             continue
         date = d.strftime('%Y-%m-%d')
+        if date in existing:
+            continue
         S, T = ws.cell(r, 19).value, ws.cell(r, 20).value      # 국장 총평가 / 순자산
         U, V = ws.cell(r, 21).value, ws.cell(r, 22).value      # 미장 / ISA 순자산
-        if not any((S, T, U, V)) or date in existing:
+        asset, cum_pnl = ws.cell(r, 2).value, ws.cell(r, 4).value   # 순자산(B) / 누적손익(D)
+        if not any((S, T, U, V, asset)):
             continue
         row = {c: '' for c in DAILY_COLS}
         row['date'] = date
@@ -412,8 +420,13 @@ def backfill(xlsx):
             kind = 'backfill(전체)'
         elif T and not (U or V):
             kind = 'backfill(국장만)'          # 미장·ISA 기록이 아예 없던 구간
+        elif asset:
+            row['equity'] = num(asset)
+            kind = 'backfill(순자산)'          # S~V 없이 주기적 순자산 스냅샷만 있는 구간
         else:
             kind = 'backfill(국장순자산 누락)'  # 미장·ISA 는 있는데 국장 순자산이 빈 행
+        if cum_pnl is not None:
+            row['surface_pnl'] = num(cum_pnl)
         row['source'] = kind
         kinds[kind] = kinds.get(kind, 0) + 1
         existing[date] = row
