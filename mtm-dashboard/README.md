@@ -33,7 +33,6 @@
 | 파일 | 원래 시트 | 이게 뭔지 |
 |---|---|---|
 | `collect.py` | 00_대시보드 + 02_룰북 + 03_포지션 | 메인 엔진. 시세 조회 → 26개 지표 계산 → 8개 룰 판정 → 콘솔 출력 → CSV 기록까지 전부 이거 하나가 함 |
-| `seed_from_xlsx.py` | (부트스트랩 전용) | 구글시트를 처음 CSV로 옮길 때 1회만 쓴 스크립트. 이미 다 썼음, 다시 쓸 일 거의 없음 |
 | `verify_against_sheet.py` | (검증 전용) | `collect.py` 계산값이 스프레드시트 수식과 정말 같은지 26개 지표를 대조. 검증용, 평소엔 안 씀 |
 | `export_to_xlsx.py` | 00_대시보드 | `collect.py`와 같은 함수를 써서 언제든 엑셀 스냅샷(`snapshot_*.xlsx`)을 뽑아주는 스크립트 |
 | `data/positions.csv` | 03_포지션 | **사람이 만지는 유일한 파일.** 종목·수량·평단·현재가·레버리지·섹터·손절가 + 계좌별 예수금 행(`sector=현금`) + 신용잔고 행(`sector=신용`). **거래·입출금·신용변동 있는 날만 수정** |
@@ -54,7 +53,7 @@ cd mtm-dashboard
 python3 collect.py                        # 매일 (또는 cron)
 ```
 
-`seed_from_xlsx.py`/`verify_against_sheet.py`/`--backfill` 는 구글시트를 다운받은
+`verify_against_sheet.py`/`--backfill` 는 구글시트를 다운받은
 `.xlsx` 파일이 있어야 도는 일회성 스크립트다. 그 파일은 저장소에 안 남겨뒀다 —
 다시 필요하면 구글 드라이브의 원본을 다시 내려받아 넘기면 된다.
 
