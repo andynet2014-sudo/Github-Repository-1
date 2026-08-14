@@ -49,6 +49,34 @@ def num(v, default=0.0):
         return default
 
 
+def load_cashflow_totals(common):
+    """cashflow.csv 가 있으면 원금·이자·강의비 누계를 여기서 직접 합산해 common 을
+    덮어쓴다. common.csv 를 손으로 따로 갱신할 필요가 없어지고, cashflow.csv 에
+    행만 추가하면 다음 실행부터 자동으로 반영된다 — 두 파일이 따로 놀며 어긋나는 걸
+    막기 위한 단일 소스."""
+    rows = read_csv('cashflow.csv')
+    if not rows:
+        return common
+    common = dict(common)
+    interest = sum(num(r['amount']) for r in rows if r['type'] == '신용이자')
+    course_fees = sum(num(r['amount']) for r in rows if r['type'] == '강의구독비')
+    principal = {'국장': 0.0, '미장': 0.0, 'ISA': 0.0}
+    for r in rows:
+        if r['type'] in ('신용이자', '강의구독비'):
+            continue
+        amt = num(r['amount'])
+        if r['from_account'] in principal:
+            principal[r['from_account']] -= amt
+        if r['to_account'] in principal:
+            principal[r['to_account']] += amt
+    common['cum_interest'] = interest
+    common['cum_course_fees'] = course_fees
+    for acct in ('국장', '미장', 'ISA'):
+        common['principal_' + acct] = principal[acct]
+    common['principal_total'] = sum(principal.values())
+    return common
+
+
 # ─────────────────────────── 시세 ───────────────────────────
 
 def _get_json(url):
@@ -494,6 +522,7 @@ def main():
     if not positions:
         raise SystemExit('data/positions.csv 가 없습니다. seed_from_xlsx.py 를 먼저 돌리세요.')
     common = {r['key']: r['value'] for r in read_csv('common.csv')}
+    common = load_cashflow_totals(common)
     rules = read_csv('rules.csv')
 
     prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)

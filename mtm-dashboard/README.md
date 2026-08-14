@@ -35,9 +35,10 @@
 | `collect.py` | 00_대시보드 + 02_룰북 + 03_포지션 | 메인 엔진. 시세 조회 → 26개 지표 계산 → 8개 룰 판정 → 콘솔 출력 → CSV 기록까지 전부 이거 하나가 함 |
 | `verify_against_sheet.py` | (검증 전용) | `collect.py` 계산값이 스프레드시트 수식과 정말 같은지 26개 지표를 대조. 검증용, 평소엔 안 씀 |
 | `export_to_xlsx.py` | 00_대시보드 | `collect.py`와 같은 함수를 써서 언제든 엑셀 스냅샷(`snapshot_*.xlsx`)을 뽑아주는 스크립트 |
-| `data/positions.csv` | 03_포지션 | **사람이 만지는 유일한 파일.** 종목·수량·평단·현재가·레버리지·섹터·손절가 + 계좌별 예수금 행(`sector=현금`) + 신용잔고 행(`sector=신용`). **거래·입출금·신용변동 있는 날만 수정** |
-| `data/common.csv` | 03_포지션 + 07_CF_원금 | 회사대출·담보비율·연봉 + 실질순손익 계산용 원금·비용 상수. **바뀌었을 때만 수정** |
-| `data/rules.csv` | 02_룰북 | R01~R08 위반 기준값. **기준 바꿀 때만 수정** |
+| `data/positions.csv` | 03_포지션 | **사람이 만지는 파일.** 종목·수량·평단·현재가·레버리지·섹터·손절가 + 계좌별 예수금 행(`sector=현금`) + 신용잔고 행(`sector=신용`). **거래·입출금·신용변동 있는 날만 수정** |
+| `data/cashflow.csv` | 03_Cashflow | **사람이 만지는 파일.** 계좌간 이체·외부입출금·신용이자·강의구독비 원장(누적, append-only). `principal_*`·`cum_interest`·`cum_course_fees`는 여기서 매번 자동 합산됨 |
+| `data/common.csv` | 03_포지션 + 03_Cashflow | 회사대출·담보비율·연봉·`cum_tax_est`(추정세액). **바뀌었을 때만 수정** — 원금·이자·강의비는 이제 `cashflow.csv`가 원본 |
+| `data/rules.csv` | 02_원칙 | R01~R08 위반 기준값. **기준 바꿀 때만 수정** |
 | `data/prices.csv` | (자동) | 종목별 최근 조회 시세 캐시. 손대지 않음 |
 | `data/daily.csv` | 01_일별로그 | 계좌 합계(순자산·레버리지·손익 등) 이력, 하루 한 줄. 손대지 않음 |
 | `data/positions_history.csv` | (신규, 원래 시트에 없음) | **종목별** 이력. `positions.csv`는 매번 덮어써져서 과거를 못 보므로, 실행할 때마다 그날 종목별 수량·평단·현재가·손익을 `date+ticker+account` 키로 쌓는다. 손대지 않음 |
@@ -114,11 +115,16 @@ python3 export_to_xlsx.py --date 2026-08-11
 
 ## 실질 누적 순손익
 
-`data/common.csv` 에 `principal_total`(누적 순투입 원금) · `cum_course_fees`(강의·구독비) ·
-`cum_tax_est`(해외주식 예상세액) · `cum_interest`(참고용, 차감 안 함) 를 넣어 두면
-표면 손익(계좌 순자산 − 원금)에서 강의비·세금만 뺀 실질 순손익을 계산한다
-(v2.4.5 `03_Cashflow`(구 07_CF_원금, 구 09) Ⅴ 와 같은 정의). 이 네 값은 거래 원장이 바뀔 때만 손으로 갱신한다
-— 매일 자동 갱신되는 값이 아니다.
+`principal_total`(누적 순투입 원금) · `cum_course_fees`(강의·구독비) · `cum_interest`(참고용,
+차감 안 함) · 계좌별 `principal_국장`/`principal_미장`/`principal_ISA` 이 다섯 값은 이제
+**`data/cashflow.csv` 에서 매 실행마다 자동으로 합산**된다 (`load_cashflow_totals()`) —
+거래원장에 행을 추가하면 다음 `collect.py` 실행부터 곧바로 반영되고, `common.csv` 를
+따로 손댈 필요가 없다. `cum_tax_est`(해외주식 예상세액)만 여전히 `common.csv` 에 손으로
+넣는다(실현손익 기반 추정이라 원장에서 자동 계산되지 않음). `cashflow.csv` 가 없거나
+비어 있으면 `common.csv` 의 값을 그대로 쓴다(안전장치).
+
+표면 손익(계좌 순자산 − 원금)에서 강의비·세금만 뺀 게 실질 순손익이다
+(v2.4.5 `03_Cashflow`(구 07_CF_원금, 구 09) Ⅴ 와 같은 정의).
 
 ## 웹 대시보드 (MtM Dashboard)
 
