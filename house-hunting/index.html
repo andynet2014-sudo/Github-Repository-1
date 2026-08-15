@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>이사 매물 대시보드</title>
+<style>
+  :root {
+    --ink: #16211f;
+    --ink-soft: #46524f;
+    --paper: #f2f5f4;
+    --paper-raised: #ffffff;
+    --line: #dbe2e0;
+    --muted: #5b6866;
+    --accent: #1f6f63;
+    --accent-ink: #0f3e37;
+    --accent-soft: #dcede9;
+    --status-interest-bg: #e4ebf5; --status-interest-fg: #3c5c86;
+    --status-contact-bg: #f3ead6;  --status-contact-fg: #8a6a1f;
+    --status-visit-bg: #eae2f2;    --status-visit-fg: #6b4b96;
+    --status-visited-bg: #dcede9;  --status-visited-fg: #1f6f63;
+    --status-hold-bg: #ece9e4;     --status-hold-fg: #756b5c;
+    --status-out-bg: #f2ded9;      --status-out-fg: #a1462c;
+    --status-done-bg: #d9ecdc;     --status-done-fg: #2d7a3e;
+    --shadow: 0 1px 2px rgba(22,33,31,0.06), 0 8px 24px -12px rgba(22,33,31,0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #eaf1ef;
+      --ink-soft: #b9c6c3;
+      --paper: #121917;
+      --paper-raised: #1a2320;
+      --line: #2b3733;
+      --muted: #93a19d;
+      --accent: #52c9b6;
+      --accent-ink: #d7f4ee;
+      --accent-soft: #1e3733;
+      --status-interest-bg: #263349; --status-interest-fg: #a9c1e8;
+      --status-contact-bg: #3a3120;  --status-contact-fg: #e3c274;
+      --status-visit-bg: #322a41;    --status-visit-fg: #cbb1ea;
+      --status-visited-bg: #1e3733;  --status-visited-fg: #6fe0cb;
+      --status-hold-bg: #2b2c28;     --status-hold-fg: #b3aa9b;
+      --status-out-bg: #3a271f;      --status-out-fg: #e79274;
+      --status-done-bg: #223a28;     --status-done-fg: #7fd693;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #eaf1ef;
+    --ink-soft: #b9c6c3;
+    --paper: #121917;
+    --paper-raised: #1a2320;
+    --line: #2b3733;
+    --muted: #93a19d;
+    --accent: #52c9b6;
+    --accent-ink: #d7f4ee;
+    --accent-soft: #1e3733;
+    --status-interest-bg: #263349; --status-interest-fg: #a9c1e8;
+    --status-contact-bg: #3a3120;  --status-contact-fg: #e3c274;
+    --status-visit-bg: #322a41;    --status-visit-fg: #cbb1ea;
+    --status-visited-bg: #1e3733;  --status-visited-fg: #6fe0cb;
+    --status-hold-bg: #2b2c28;     --status-hold-fg: #b3aa9b;
+    --status-out-bg: #3a271f;      --status-out-fg: #e79274;
+    --status-done-bg: #223a28;     --status-done-fg: #7fd693;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header.top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 24px;
+  }
+
+  header.top .eyebrow {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+
+  header.top h1 {
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  header.top .updated {
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .stat {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+
+  .stat .label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .stat .value {
+    font-size: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .stat .value small {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 6px 13px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .chip:hover { border-color: var(--accent); }
+
+  .chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper-raised);
+    font-weight: 600;
+  }
+
+  select#sort {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    color: var(--ink);
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .card-head .titles h3 {
+    margin: 0 0 3px;
+    font-size: 16.5px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+  }
+
+  .card-head .titles .addr {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .pill {
+    flex: none;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .price-row .type-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 6px;
+    padding: 2px 7px;
+  }
+
+  .price-row .amount {
+    font-size: 21px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .price-row .amount .unit {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .facts span b { color: var(--ink); font-weight: 600; }
+
+  .rating {
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--accent);
+  }
+  .rating .empty { color: var(--line); }
+
+  .memo {
+    font-size: 13px;
+    color: var(--ink-soft);
+    border-top: 1px dashed var(--line);
+    padding-top: 10px;
+    margin-top: 2px;
+  }
+
+  .card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: auto;
+  }
+
+  .card-foot a {
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .card-foot a:hover { text-decoration: underline; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  footer.hint {
+    margin-top: 40px;
+    font-size: 12.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  footer.hint code {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .chip, .card { transition: box-shadow 0.15s, transform 0.15s, background 0.15s, color 0.15s, border-color 0.15s; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Moving House Tracker</p>
+        <h1>이사 매물 대시보드</h1>
+      </div>
+      <div class="updated" id="lastUpdated"></div>
+    </header>
+
+    <section class="stats" id="stats"></section>
+
+    <div class="controls">
+      <div class="chip-row" id="statusChips"></div>
+      <select id="sort">
+        <option value="updated">최근 업데이트순</option>
+        <option value="price-asc">가격 낮은순</option>
+        <option value="price-desc">가격 높은순</option>
+        <option value="rating">별점 높은순</option>
+      </select>
+    </div>
+
+    <section class="grid" id="grid"></section>
+
+    <footer class="hint">
+      새 매물은 <code>data/properties.js</code>의 <code>PROPERTIES</code> 배열에 항목을 추가하면 이 페이지에 바로 반영됩니다.
+    </footer>
+  </div>
+
+  <script src="data/properties.js"></script>
+  <script>
+    const STATUS_META = {
+      "관심":     { bg: "var(--status-interest-bg)", fg: "var(--status-interest-fg)" },
+      "연락함":   { bg: "var(--status-contact-bg)",  fg: "var(--status-contact-fg)" },
+      "방문예정": { bg: "var(--status-visit-bg)",    fg: "var(--status-visit-fg)" },
+      "방문완료": { bg: "var(--status-visited-bg)",  fg: "var(--status-visited-fg)" },
+      "보류":     { bg: "var(--status-hold-bg)",     fg: "var(--status-hold-fg)" },
+      "탈락":     { bg: "var(--status-out-bg)",      fg: "var(--status-out-fg)" },
+      "계약완료": { bg: "var(--status-done-bg)",     fg: "var(--status-done-fg)" },
+    };
+
+    const data = (typeof PROPERTIES !== "undefined") ? PROPERTIES : [];
+    let activeStatus = "전체";
+    let sortMode = "updated";
+
+    function fmtWon(v) {
+      return Number(v || 0).toLocaleString("ko-KR");
+    }
+
+    function priceLine(p) {
+      if (p.type === "월세") {
+        return `<span class="type-tag">월세</span><span class="amount">${fmtWon(p.price)}<span class="unit">/${fmtWon(p.monthly)}만원</span></span>`;
+      }
+      return `<span class="type-tag">${p.type}</span><span class="amount">${fmtWon(p.price)}<span class="unit">만원</span></span>`;
+    }
+
+    function priceSortValue(p) {
+      return p.type === "월세" ? p.monthly * 200 + p.price : p.price;
+    }
+
+    function stars(n) {
+      n = Number(n) || 0;
+      let out = "";
+      for (let i = 0; i < 5; i++) {
+        out += i < n ? "★" : '<span class="empty">★</span>';
+      }
+      return out;
+    }
+
+    function renderStats(list) {
+      const total = list.length;
+      const jeonseWolse = list.filter(p => p.type !== "매매");
+      const avgDeposit = jeonseWolse.length
+        ? Math.round(jeonseWolse.reduce((s, p) => s + Number(p.price || 0), 0) / jeonseWolse.length)
+        : 0;
+      const visiting = list.filter(p => p.status === "방문예정").length;
+      const interested = list.filter(p => p.status === "관심" || p.status === "방문완료").length;
+
+      const stats = [
+        { label: "전체 매물", value: `${total}<small> 건</small>` },
+        { label: "평균 보증금", value: `${fmtWon(avgDeposit)}<small> 만원</small>` },
+        { label: "방문 예정", value: `${visiting}<small> 건</small>` },
+        { label: "관심 매물", value: `${interested}<small> 건</small>` },
+      ];
+
+      document.getElementById("stats").innerHTML = stats.map(s => `
+        <div class="stat">
+          <div class="label">${s.label}</div>
+          <div class="value">${s.value}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderChips() {
+      const statuses = ["전체", ...Object.keys(STATUS_META)];
+      document.getElementById("statusChips").innerHTML = statuses.map(s => `
+        <button class="chip ${s === activeStatus ? "active" : ""}" data-status="${s}">${s}</button>
+      `).join("");
+      document.querySelectorAll(".chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          activeStatus = btn.dataset.status;
+          render();
+        });
+      });
+    }
+
+    function renderGrid() {
+      let list = data.slice();
+      if (activeStatus !== "전체") {
+        list = list.filter(p => p.status === activeStatus);
+      }
+
+      if (sortMode === "price-asc") list.sort((a, b) => priceSortValue(a) - priceSortValue(b));
+      else if (sortMode === "price-desc") list.sort((a, b) => priceSortValue(b) - priceSortValue(a));
+      else if (sortMode === "rating") list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      else list.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+
+      const grid = document.getElementById("grid");
+      if (!list.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">해당하는 매물이 없습니다.</div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map(p => {
+        const meta = STATUS_META[p.status] || { bg: "var(--status-hold-bg)", fg: "var(--status-hold-fg)" };
+        return `
+        <article class="card">
+          <div class="card-head">
+            <div class="titles">
+              <h3>${p.name || "이름 없음"}</h3>
+              <div class="addr">${p.address || ""}</div>
+            </div>
+            <span class="pill" style="background:${meta.bg}; color:${meta.fg};">${p.status || "-"}</span>
+          </div>
+          <div class="price-row">${priceLine(p)}</div>
+          <div class="facts">
+            <span><b>${p.area || "-"}</b>㎡</span>
+            <span><b>${p.floor || "-"}</b>층</span>
+            <span>${p.rooms || "-"}</span>
+            <span>입주 <b>${p.moveIn || "-"}</b></span>
+          </div>
+          <div class="rating">${stars(p.rating)}</div>
+          ${p.memo ? `<div class="memo">${p.memo}</div>` : ""}
+          <div class="card-foot">
+            <span>${p.source || ""} · ${p.updatedAt || ""}</span>
+            ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener noreferrer">매물 보기 ↗</a>` : ""}
+          </div>
+        </article>
+        `;
+      }).join("");
+    }
+
+    function render() {
+      renderStats(data);
+      renderChips();
+      renderGrid();
+    }
+
+    document.getElementById("sort").addEventListener("change", (e) => {
+      sortMode = e.target.value;
+      renderGrid();
+    });
+
+    document.getElementById("lastUpdated").textContent = data.length
+      ? `최근 업데이트: ${data.reduce((a, p) => (p.updatedAt || "") > a ? p.updatedAt : a, "")}`
+      : "";
+
+    render();
+  </script>
+</body>
+</html>
