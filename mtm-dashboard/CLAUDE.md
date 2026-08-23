@@ -57,11 +57,13 @@ GROSS는 `국장_total`, NET은 `국장_equity` 칼럼에 분리해서 저장한
 
 ## Git
 
-**`main`은 절대 건드리지 않는다.** 이 저장소의 `main`은 사용자의 옵시디언(Obsidian) 노트
-vault가 로컬 Git 플러그인으로 자동 동기화하던 브랜치였다(2026-08-24, `Obsidian-Vault`
-별도 저장소로 이전 완료했지만 `main`엔 그 흔적이 남아있음). MtM 작업은 전부
-**`mtm-dashboard`** 브랜치(= `claude/google-drive-connector-folders-lu7bxq`와 동일 커밋)
-에서만 한다 — main으로 push하거나 main과 병합하지 말 것.
+`main`이 MtM 대시보드의 정식 브랜치다. (2026-08-24: 한때 사용자의 옵시디언 노트 vault가
+로컬 Git 플러그인으로 이 저장소의 main에 자동 동기화되던 사고가 있었음 — vault는
+`Obsidian-Vault` 별도 저장소로 이전 완료했고, main은 MtM 대시보드 내용으로 되돌려놨다.
+그 사고 당시의 옛 main 상태는 `archive/obsidian-main-backup-20260824` 브랜치에 백업해둠,
+필요 없으면 나중에 지워도 됨.) `claude/google-drive-connector-folders-lu7bxq`와
+`mtm-dashboard` 브랜치도 같은 내용을 가리키고 있으니 계속 써도 무방하나, 새로 시작한다면
+`main`을 기준으로 삼을 것.
 
 검증 없이 큰 변경(계산 공식 변경, 대량 백필, 스키마 변경)을 바로 커밋하지 말 것 — 아래
 "대시보드 반영 절차"를 거쳐 검증한 뒤에만 커밋한다. 작은 수정(UI 문구, 이미 검증된 데이터
