@@ -58,11 +58,15 @@ def load_cashflow_totals(common):
     if not rows:
         return common
     common = dict(common)
+    NON_PRINCIPAL = ('신용이자', '강의구독비', '수수료', '매도세금', '배당금')
     interest = sum(num(r['amount']) for r in rows if r['type'] == '신용이자')
     course_fees = sum(num(r['amount']) for r in rows if r['type'] == '강의구독비')
+    trade_fees = sum(num(r['amount']) for r in rows if r['type'] == '수수료')
+    sec_tax = sum(num(r['amount']) for r in rows if r['type'] == '매도세금')
+    dividend = sum(num(r['amount']) for r in rows if r['type'] == '배당금')
     principal = {'국장': 0.0, '미장': 0.0, 'ISA': 0.0}
     for r in rows:
-        if r['type'] in ('신용이자', '강의구독비'):
+        if r['type'] in NON_PRINCIPAL:
             continue
         amt = num(r['amount'])
         if r['from_account'] in principal:
@@ -71,6 +75,9 @@ def load_cashflow_totals(common):
             principal[r['to_account']] += amt
     common['cum_interest'] = interest
     common['cum_course_fees'] = course_fees
+    common['cum_trade_fees'] = trade_fees
+    common['cum_sec_tax'] = sec_tax
+    common['cum_dividend'] = dividend
     for acct in ('국장', '미장', 'ISA'):
         common['principal_' + acct] = principal[acct]
     common['principal_total'] = sum(principal.values())
@@ -280,6 +287,9 @@ def compute(positions, prices, common):
         'lev_etf_nominal': lev_etf_nominal,
         'principal_total': principal_total, 'surface_pnl': surface_pnl,
         'cum_interest': num(common.get('cum_interest', 0)),
+        'cum_trade_fees': num(common.get('cum_trade_fees', 0)),
+        'cum_sec_tax': num(common.get('cum_sec_tax', 0)),
+        'cum_dividend': num(common.get('cum_dividend', 0)),
         'cum_course_fees': course_fees, 'cum_tax_est': tax_est,
         'net_pnl': net_pnl, 'net_return': div(net_pnl, principal_total),
     }
