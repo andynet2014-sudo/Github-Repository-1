@@ -1,0 +1,379 @@
+<title>운영 가이드</title>
+<style>
+  :root {
+    --bg: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ee;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --border: rgba(11,11,11,0.10);
+    --grid: #e1e0d9;
+    --accent: #2a78d6;
+    --accent-soft: rgba(42,120,214,0.10);
+    --good: #0ca30c;
+    --good-soft: rgba(12,163,12,0.10);
+    --warning: #d98a00;
+    --warning-soft: rgba(250,178,25,0.16);
+    --critical: #d03b3b;
+    --critical-soft: rgba(208,59,59,0.09);
+    --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #222220;
+      --ink: #ffffff; --ink-2: #c3c2b7; --ink-muted: #8f8d87;
+      --border: rgba(255,255,255,0.10); --grid: #2c2c2a;
+      --accent: #5b9eef; --accent-soft: rgba(91,158,239,0.14);
+      --good: #2fbf2f; --good-soft: rgba(47,191,47,0.14);
+      --warning: #fab219; --warning-soft: rgba(250,178,25,0.14);
+      --critical: #ef6a6a; --critical-soft: rgba(239,106,106,0.13);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #222220;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-muted: #8f8d87;
+    --border: rgba(255,255,255,0.10); --grid: #2c2c2a;
+    --accent: #5b9eef; --accent-soft: rgba(91,158,239,0.14);
+    --good: #2fbf2f; --good-soft: rgba(47,191,47,0.14);
+    --warning: #fab219; --warning-soft: rgba(250,178,25,0.14);
+    --critical: #ef6a6a; --critical-soft: rgba(239,106,106,0.13);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); }
+  code, .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; }
+
+  .shell { max-width: 1100px; margin: 0 auto; padding: 28px 20px 72px; display: flex; gap: 32px; align-items: flex-start; }
+  .content { flex: 1; min-width: 0; }
+
+  /* ---------- header ---------- */
+  header { margin-bottom: 22px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-muted); margin: 0 0 8px;
+  }
+  h1 { font-size: 27px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
+  .subline { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; color: var(--ink-2); font-size: 13px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 700; border: 1px solid var(--border);
+  }
+  .pill.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .pill.good { background: var(--good-soft); color: var(--good); border-color: transparent; }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .sep { color: var(--border); }
+
+  /* ---------- toc ---------- */
+  nav.toc {
+    position: sticky; top: 20px; width: 176px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 2px; padding-top: 4px;
+  }
+  nav.toc a {
+    text-decoration: none; color: var(--ink-muted); font-size: 12.5px; font-weight: 600;
+    padding: 6px 10px; border-radius: 8px; border-left: 2px solid transparent;
+  }
+  nav.toc a:hover { color: var(--ink); background: var(--surface-2); }
+  nav.toc .toc-n { font-family: ui-monospace, monospace; opacity: .55; margin-right: 6px; }
+
+  /* ---------- cards / sections ---------- */
+  section { margin-bottom: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  h2 { font-size: 16px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.005em; display: flex; align-items: center; gap: 9px; }
+  h2 .h2n {
+    font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); width: 22px; height: 22px; border-radius: 7px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  h3 { font-size: 12.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+  h3:first-of-type { margin-top: 14px; }
+  p.lead { color: var(--ink-2); font-size: 13.5px; line-height: 1.65; margin: 10px 0 0; }
+  p.lead + p.lead { margin-top: 8px; }
+
+  ul.rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  ul.rules li {
+    font-size: 13px; line-height: 1.6; color: var(--ink-2); padding-left: 16px; position: relative;
+  }
+  ul.rules li::before {
+    content: ''; position: absolute; left: 2px; top: 8px; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--accent);
+  }
+  ul.rules b { color: var(--ink); font-weight: 700; }
+  ul.rules .warn-tag {
+    display: inline-block; font-size: 10.5px; font-weight: 800; color: var(--critical);
+    background: var(--critical-soft); border-radius: 5px; padding: 1px 6px; margin-right: 5px;
+    text-transform: uppercase; letter-spacing: .03em; vertical-align: 1px;
+  }
+
+  code.inline {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 1px 6px; font-size: 12px; color: var(--ink);
+  }
+
+  /* ---------- data file table ---------- */
+  .filetable { display: flex; flex-direction: column; gap: 10px; }
+  .filerow {
+    display: grid; grid-template-columns: 168px 1fr; gap: 4px 18px;
+    padding: 13px 0; border-bottom: 1px solid var(--border);
+  }
+  .filerow:last-child { border-bottom: none; padding-bottom: 0; }
+  .filerow .fname { font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .filerow .fformat { font-size: 10.5px; color: var(--ink-muted); margin-top: 3px; }
+  .filerow .fdesc { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+  .filerow .fstatus { font-size: 11.5px; color: var(--ink-muted); margin-top: 5px; line-height: 1.6; }
+  .filerow .fstatus b { color: var(--ink-2); font-weight: 600; }
+  .freshness { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; margin-right: 8px; }
+  .freshness.live { color: var(--good); }
+  .freshness.manual { color: var(--accent); }
+  .freshness .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ---------- artifact link card ---------- */
+  .linkcard {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; margin-top: 4px;
+  }
+  .linkcard .lc-url { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--accent); word-break: break-all; }
+  .linkcard a.lc-btn {
+    flex-shrink: 0; text-decoration: none; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    padding: 7px 14px; border-radius: 8px;
+  }
+  .workflow {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+    font-size: 11.5px; color: var(--ink-muted);
+  }
+  .workflow .wstep {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; color: var(--ink-2); font-weight: 600;
+  }
+  .workflow .warrow { color: var(--border); font-weight: 700; }
+
+  /* ---------- todo ---------- */
+  ul.todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ul.todo li {
+    display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.6; color: var(--ink-2);
+  }
+  ul.todo .box {
+    flex-shrink: 0; width: 15px; height: 15px; border: 1.5px solid var(--border); border-radius: 4px; margin-top: 2px;
+  }
+  ul.todo b { color: var(--ink); font-weight: 700; }
+
+  footer { margin-top: 22px; padding-top: 14px; border-top: 1px dashed var(--border); font-size: 11px; color: var(--ink-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+
+  @media (max-width: 860px) {
+    .shell { flex-direction: column; }
+    nav.toc {
+      position: static; width: 100%; flex-direction: row; overflow-x: auto; gap: 6px;
+      padding-bottom: 6px; margin-bottom: 4px;
+    }
+    nav.toc a { flex-shrink: 0; }
+    .filerow { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="shell">
+  <nav class="toc">
+    <a href="#overview"><span class="toc-n">01</span>시스템 개요</a>
+    <a href="#rules"><span class="toc-n">02</span>핵심 규칙</a>
+    <a href="#files"><span class="toc-n">03</span>데이터 파일</a>
+    <a href="#dashboard"><span class="toc-n">04</span>대시보드</a>
+    <a href="#todo"><span class="toc-n">05</span>To-Do</a>
+  </nav>
+
+  <div class="content">
+    <header>
+      <p class="eyebrow">MTM DASHBOARD · 운영 가이드</p>
+      <h1>대시보드 관리를 위한 화이트리스트</h1>
+      <div class="subline">
+        <span class="pill accent"><span class="dot"></span>v1.02</span>
+        <span class="sep">·</span>
+        <span>2026-08-23 기준</span>
+        <span class="sep">·</span>
+        <span>0.01 단위로 계속 갱신</span>
+      </div>
+    </header>
+
+    <section id="overview">
+      <div class="card">
+        <h2><span class="h2n">01</span>시스템 개요</h2>
+        <p class="lead">
+          저장소 <code class="inline">andynet2014-sudo/Github-Repository-1</code>(구 260731-, 자동 리다이렉트됨) ·
+          폴더 <code class="inline">mtm-dashboard/</code> · 브랜치 <code class="inline">main</code> +
+          <code class="inline">claude/google-drive-connector-folders-lu7bxq</code>(항상 두 곳에 동시 push).
+          핵심 엔진은 <code class="inline">collect.py</code> — data/ 아래 csv들을 읽어 리스크 지표를 계산하고
+          daily.csv에 한 줄씩 기록한다.
+        </p>
+        <p class="lead">
+          추적 대상 계좌는 3개뿐이다: <b style="color:var(--ink)">국장</b>(삼성증권 7089239210-01) ·
+          <b style="color:var(--ink)">ISA</b>(삼성증권 7156461048-14) ·
+          <b style="color:var(--ink)">미장</b>(나무증권 209-01-920722). 삼성증권 CMA/IRP/DC 등 나머지 계좌는
+          명시적으로 추적 범위 밖. 중국·업비트 계좌는 daily.csv 순자산 추적 대상이 아니고, cashflow.csv에서
+          자금 이동 출발/도착지로만 등장한다.
+        </p>
+      </div>
+    </section>
+
+    <section id="rules">
+      <div class="card">
+        <h2><span class="h2n">02</span>핵심 규칙 · 반드시 지킬 컨벤션</h2>
+
+        <h3>순자산 계산 공식</h3>
+        <ul class="rules">
+          <li><b>equity(순자산) = 총평가금액(GROSS, 주식+예수금) − credit(신용대출)</b>. 브로커 리포트의 "총평가"가
+            이미 신용 차감된 값인지 GROSS인지 매번 확인할 것 — 2026-08 세션에서 이걸 착각해 국장 순자산이
+            실제의 약 2배로 잘못 들어간 적 있음(사용자 수기 실측치로 발견·수정).</li>
+          <li>GROSS 값은 <code class="inline">국장_total</code> 칼럼에, 신용 차감 후 NET 값은
+            <code class="inline">국장_equity</code> 칼럼에 분리 저장.</li>
+        </ul>
+
+        <h3>데이터 우선순위</h3>
+        <ul class="rules">
+          <li><b>사용자 수기 직접 입력 &gt; PDF/문서에서 파생 계산한 값</b> — 라이브 collect.py 실측치보다도
+            사용자가 앱 화면에서 직접 옮긴 값을 우선한다.</li>
+          <li><span class="warn-tag">필수</span>신용(credit) 값은 반드시 앱의 <b>"신용융자금" 탭</b>에서 직접 읽은
+            값을 쓴다. 월말잔고 PDF의 "대출" 컬럼이나 요약 형태로 재구성한 파일은 신뢰도가 낮을 수 있음 —
+            2026-08 세션에서 월별 요약 파일 기준 신용값이 실제 신용융자금 탭 값과 최대 30%까지 벌어진 사례를
+            확인, 신용융자금 탭 실측으로 전량 교체함.</li>
+          <li>근거 없는 값은 절대 추정해서 채우지 않는다 — 모르면 공란으로 둔다("원금이 조용히 틀리면 안 된다").</li>
+          <li>월말이 주말인 스냅샷(예: 2026-01-31 토)은 <b>직전 금요일 날짜로 이동</b>해서 저장 — 거래 없는
+            주말의 계좌 상태는 직전 거래일과 동일하다는 원칙.</li>
+          <li>라이브 실측과 사용자 수기값(평가손익추이 화면)은 D+2 예수금 인정 여부 차이로 며칠간 1~5%대 갭이
+            날 수 있음 — 정상 범위, 별도 조치 불필요.</li>
+        </ul>
+
+        <h3>cashflow.csv 항목 분류</h3>
+        <ul class="rules">
+          <li><b>원금(principal) 이동으로 취급</b>: 개시잔액 · 외부입금 · 외부출금 · 계좌간이체 → 계좌 원금
+            기준을 바꿈.</li>
+          <li><b>원금 이동 아님, 별도 누계로만 집계</b>: 신용이자 · 강의구독비 · 수수료 · 매도세금 · 배당금 →
+            <code class="inline">collect.py</code>의 <code class="inline">load_cashflow_totals()</code>가
+            principal 계산에서 제외하고 cum_interest / cum_course_fees / cum_trade_fees / cum_sec_tax /
+            cum_dividend로 따로 합산한다. (이유: 이미 계좌 잔고 변동에 반영된 비용·수익을 원금에서도 빼면
+            손익이 이중으로 왜곡됨.)</li>
+          <li>신용이자 · 수수료 · 매도세금 · 배당금은 사용자 요청으로 일별이 아닌 <b>월말 값만</b> 입력 —
+            효율성 우선.</li>
+        </ul>
+
+        <h3>daily.csv source 컬럼 표기</h3>
+        <ul class="rules">
+          <li><code class="inline">cache</code> / 실측 없음 = collect.py 라이브 실행 결과</li>
+          <li><code class="inline">backfill(...)</code> = PDF·문서 기반으로 역산/추정한 과거값</li>
+          <li><code class="inline">user(수기 키인·...)</code> = 사용자가 Numbers 템플릿에 직접 입력해 병합한
+            실측값 — 가장 신뢰도 높음</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="files">
+      <div class="card">
+        <h2><span class="h2n">03</span>데이터 파일 현황</h2>
+        <div class="filetable">
+          <div class="filerow">
+            <div><div class="fname">data/daily.csv</div><div class="fformat">CSV · 날짜별 1행</div></div>
+            <div>
+              <div class="fdesc">일별 순자산 · 레버리지 · 리스크 신호 스냅샷 (33칼럼)</div>
+              <div class="fstatus">
+                <span class="freshness manual"><span class="dot"></span>수기</span>국장/ISA: 2026-01-02~08-21
+                거의 매일(앱 평가손익추이+신용융자금 탭 기준, 최우선 신뢰)<br>
+                <span class="freshness live"><span class="dot"></span>라이브</span>collect.py: 2026-08-20까지
+                · 2025-01~2025-12은 월말 스냅샷만
+              </div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">data/cashflow.csv</div><div class="fformat">CSV · 거래별 1행</div></div>
+            <div>
+              <div class="fdesc">입출금 · 계좌이체 · 이자 · 수수료 · 세금 · 배당금 원장</div>
+              <div class="fstatus"><b>2025-11-18</b>(개시잔액)부터 <b>2026-08-13</b>까지 + 2026-01~07 월말 비용 항목</div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">data/journal.csv</div><div class="fformat">CSV</div></div>
+            <div>
+              <div class="fdesc">매매일지(현재 SOXL · MRVL만 상세 기록)</div>
+              <div class="fstatus">미장 143개 종목 상세 백필은 사용자 요청으로 보류 중</div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">data/positions.csv<br>data/prices.csv</div><div class="fformat">CSV</div></div>
+            <div>
+              <div class="fdesc">현재 보유 포지션 · 시세 (라이브 스냅샷)</div>
+              <div class="fstatus">collect.py 실행 시점 기준</div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">data/common.csv</div><div class="fformat">CSV · key-value</div></div>
+            <div>
+              <div class="fdesc">계좌별 원금 시드값 · 급여 · 세금 추정치 등 고정 파라미터</div>
+              <div class="fstatus"><code class="inline">principal_*</code>은 이제 cashflow.csv에서 자동 파생(수정 불필요)</div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">data/viewtracker.csv<br>data/actions.csv</div><div class="fformat">CSV</div></div>
+            <div>
+              <div class="fdesc">패널 시황 톤 로그 / 할 일 액션 아이템</div>
+              <div class="fstatus">수시 업데이트</div>
+            </div>
+          </div>
+          <div class="filerow">
+            <div><div class="fname">collect.py</div><div class="fformat">Python</div></div>
+            <div>
+              <div class="fdesc">리스크 엔진 — daily.csv 등을 읽어 지표 계산</div>
+              <div class="fstatus"><code class="inline">load_cashflow_totals()</code>에 수수료/매도세금/배당금 반영(2026-08 세션)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dashboard">
+      <div class="card">
+        <h2><span class="h2n">04</span>대시보드 아티팩트</h2>
+        <p class="lead">데이터 갱신 시 같은 URL로 재배포한다(고정 링크).</p>
+        <div class="linkcard">
+          <span class="lc-url">claude.ai/code/artifact/66481dfc-fea9-4c7e-8051-5adf12384a77</span>
+          <a class="lc-btn" href="https://claude.ai/code/artifact/66481dfc-fea9-4c7e-8051-5adf12384a77" target="_blank" rel="noopener">열기 →</a>
+        </div>
+        <div class="workflow">
+          <span class="wstep">daily.csv / cashflow.csv 수정</span><span class="warrow">→</span>
+          <span class="wstep">rebuild 스크립트로 dash_data.json 재생성</span><span class="warrow">→</span>
+          <span class="wstep">risk-console.html에 주입</span><span class="warrow">→</span>
+          <span class="wstep">jsdom 오류 0건 확인</span><span class="warrow">→</span>
+          <span class="wstep">재배포</span><span class="warrow">→</span>
+          <span class="wstep">git commit·push</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="todo">
+      <div class="card">
+        <h2><span class="h2n">05</span>사용자 To-Do</h2>
+        <ul class="todo">
+          <li><span class="box"></span><span><b>2026-08-22 이후분 국장/ISA 일별 잔고</b>를 Numbers 템플릿에 계속
+            키인(1~8/21 완료) — 매달 신용이자/수수료/매도세금/배당금은 월말 값만 입력하면 됨. 신용은 반드시
+            "신용융자금" 탭 값으로.</span></li>
+          <li><span class="box"></span><span><b>국장 입금고/출금고 칼럼</b>: 이제 1~8월 데이터가 쌓여 기존
+            cashflow.csv 계좌간이체·외부입금 기록과의 날짜 차이(D+2 추정) 패턴 분석이 가능 — 다음 세션에서
+            진행 예정, 아직 cashflow.csv에는 미반영.</span></li>
+          <li><span class="box"></span><span>삼성증권(국장/ISA)에서 계좌별 진짜 일별 잔고 export가 가능한지
+            계속 확인 — 가능해지면 수기 입력 대체.</span></li>
+          <li><span class="box"></span><span>미장 143개 종목 매매일지(journal.csv) 상세 백필 여부 추후 결정.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      <span>v1.02 · 2026-08-23 기준</span>
+      <span>다음 갱신 시 v1.03로 버전업</span>
+    </footer>
+  </div>
+</div>
