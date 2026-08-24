@@ -101,9 +101,10 @@ python3 export_to_xlsx.py --date YYYY-MM-DD
 포지션 스냅샷 기록만으로는 불필요). `CLAUDE.md`의 "대시보드(아티팩트) 반영 절차"
 섹션이 원본이며, 요약하면:
 
-1. rebuild 스크립트로 `dash_data.json` 재생성 (`collect.py`의 `compute()` 등을
-   재사용 — 새 스크립트를 즉흥적으로 짜지 말고 기존 재생성 스크립트가 있는지 먼저
-   찾는다).
+1. `python3 build_dash_data.py --date YYYY-MM-DD --prev-json data/dash_data.json
+   --out data/dash_data.json` 로 `dash_data.json` 재생성 (`collect.py`의
+   `compute()`/`judge()`를 재사용 — trades/view_*/ideas/notes/monthly 과거분 같은
+   정성적 필드는 `--prev-json`에서 그대로 이어받는다).
 2. `risk-console.html`의 `const DATA = {...}` 블록에 새 JSON을 주입한다. Python
    문자열 치환으로 할 경우 `re.sub`의 치환 문자열 인자에 백슬래시 이스케이프가
    해석되는 함정이 있다 — 인덱스 슬라이싱이나 `lambda` 치환을 써서 JSON 안의

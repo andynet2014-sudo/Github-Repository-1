@@ -130,8 +130,24 @@ python3 export_to_xlsx.py --date 2026-08-11
 
 리스크 신호등·계좌·포트폴리오·실질 순손익은 이 저장소 데이터로, 매매일지·뷰트래커·
 생각노트는 구글시트로 만든 통합 스냅샷 페이지가 따로 있다. 정적 스냅샷이라 자동
-갱신되지 않는다 — 최신 내용으로 다시 보고 싶으면 요청하면 된다. 저장소에는 생성
-스크립트를 아직 안 넣었다 (요청 시 만들 예정).
+갱신되지 않는다 — 최신 내용으로 다시 보고 싶으면 요청하면 된다.
+
+`build_dash_data.py`가 `collect.py`의 `compute()`/`judge()`를 재사용해 아티팩트의
+`const DATA = {...}` JSON을 재생성한다. trades/view_*/ideas/notes/principles/
+actions/cashflow/monthly(과거분)처럼 사람이 구글시트·채팅으로 쌓은 정성적 내용은
+직전 아티팩트 JSON에서 그대로 들고 오고, 날짜가 바뀌면 갱신돼야 하는 숫자 부분만
+새로 계산한다.
+
+```bash
+python3 build_dash_data.py --date 2026-08-21 \
+  --prev-json data/dash_data.json --out data/dash_data.json
+```
+
+이후 `CLAUDE.md`의 "대시보드(아티팩트) 반영 절차"대로 `risk-console.html`의
+`const DATA = {...}` 블록에 주입 → jsdom 콘솔 에러 0건 확인 → Playwright
+라이트/다크 스크린샷 확인 → 같은 아티팩트 URL로 재배포한다.
+`data/dash_data.json`은 매 실행 결과(=아티팩트에 실제 배포된 최신 상태)를
+저장소에 같이 커밋해 다음 실행의 `--prev-json` 입력이자 이력으로 쓴다.
 
 월간결산은 daily.csv 에 순자산(`equity`)이 찍힌 날이 아직 며칠 안 돼서 완전하게는
 못 낸다 — 데이터가 쌓이는 대로 자동으로 채워진다.
