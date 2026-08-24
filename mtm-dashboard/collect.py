@@ -158,96 +158,163 @@ def upsert_macro(date, values):
     return row
 
 
-# ─────────────────────────── 관심종목(워치리스트) ───────────────────────────
-# positions.csv 와 달리 수량·평단이 없다 — 손익·리스크 계산에는 안 들어가고,
-# 그냥 매일 종가만 watchlist_history.csv 에 쌓는다. 사람이 watchlist.csv 에
-# 티커를 추가/삭제하면 다음 실행부터 반영된다.
-WATCHLIST_HISTORY_COLS = ['date', 'ticker', 'name', 'price', 'ccy', 'price_krw', 'source']
+# ─────────────────────────── 가격 마스터 테이블 ───────────────────────────
+# 보유 포지션이든 관심종목(워치리스트)이든, 시세가 필요한 티커는 전부 여기
+# 한 곳에서만 조회·기록한다. positions.csv/watchlist.csv 는 "무엇을 추적할지"만
+# 정의하고, 실제 날짜별 가격은 price_history.csv 에 티커당 하루 한 행으로 쌓인다.
+# 같은 종목이 국내 상장(KRX:000660)과 미국 ADR(SKHY)처럼 다른 티커로 따로
+# 등록돼 있으면 서로 다른 상품이므로 각각 별도 행으로 쌓인다.
+NONMARKET = ('현금', '신용')   # positions.csv 안에서 시세 조회 대상이 아닌 섹터
+
+PRICE_HISTORY_COLS = ['date', 'ticker', 'name', 'quote_symbol', 'quote_ccy',
+                      'price', 'price_krw', 'source']
 
 
-def load_watchlist(do_fetch):
-    rows = read_csv('watchlist.csv')
-    if not rows or not do_fetch:
-        return [], []
+def instrument_list(positions):
+    """positions.csv(현금/신용 제외) + watchlist.csv 를 합쳐 시세 조회 대상
+    티커 목록을 만든다. 같은 티커가 양쪽에 있으면 하나로 합친다(포지션 쪽 이름 우선)."""
+    seen = {}
+    for w in read_csv('watchlist.csv'):
+        seen[w['ticker']] = {'ticker': w['ticker'], 'name': w['name'],
+                             'quote_symbol': w['quote_symbol'], 'quote_ccy': w['quote_ccy']}
+    for p in positions:
+        if p['sector'] in NONMARKET:
+            continue
+        seen[p['ticker']] = {'ticker': p['ticker'], 'name': p['name'],
+                             'quote_symbol': p['quote_symbol'], 'quote_ccy': p['quote_ccy']}
+    return list(seen.values())
+
+
+def fetch_price_table(instruments, do_fetch, asof):
+    """{ticker: (원화가격, 출처)} 를 한 번의 조회로 채운다. 실패한 티커는
+    price_history.csv 의 가장 최근 값으로 대체하고 실패 목록을 함께 돌려준다."""
+    last = {}
+    for r in read_csv('price_history.csv'):        # 날짜순 파일이라 마지막 값이 최신
+        last[r['ticker']] = r
+
     fx = None
-    if any(r['quote_ccy'] == 'USD' for r in rows):
+    if do_fetch and any(i['quote_ccy'] == 'USD' for i in instruments):
         try:
             fx, _ = fetch_yahoo('USDKRW=X')
         except Exception:
-            pass
-    out, failed = [], []
-    for r in rows:
-        try:
-            if r['quote_ccy'] == 'KRW':
-                price, src = fetch_krx(r['quote_symbol'])
-                price_krw = price
-            else:
-                price, src = fetch_yahoo(r['quote_symbol'])
-                price_krw = price * fx if fx else None
-        except Exception as e:
-            failed.append((r['ticker'], str(e)[:60]))
-            continue
-        out.append({'ticker': r['ticker'], 'name': r['name'], 'price': round(price, 4),
-                    'ccy': r['quote_ccy'],
-                    'price_krw': round(price_krw, 2) if price_krw is not None else '',
-                    'source': src})
-    return out, failed
+            pass   # 실패해도 KRW 종목은 계속 조회한다 — USD 쪽만 캐시로 대체됨
 
-
-def upsert_watchlist_history(date, rows):
-    keep = [r for r in read_csv('watchlist_history.csv') if r['date'] != date]
-    for r in rows:
-        keep.append({'date': date, **r})
-    keep.sort(key=lambda r: (r['date'], r['ticker']))
-    write_csv('watchlist_history.csv', keep, WATCHLIST_HISTORY_COLS)
-
-
-def load_prices(positions, do_fetch, asof):
-    """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다.
-
-    sector == '현금'/'신용' 행은 시장 시세가 없다 — positions.csv 에 사람이 적어 둔
-    avg_price_krw(=잔액) 를 그대로 '가격'으로 쓴다. 조회도, 캐시 대체도 하지 않는다.
-    """
-    cache = {r['ticker']: r for r in read_csv('prices.csv')}
-    out, failed, fx = {}, [], None
-    NONMARKET = ('현금', '신용')
-
-    if do_fetch and any(p['quote_ccy'] == 'USD' for p in positions if p['sector'] not in NONMARKET):
-        try:
-            fx, _ = fetch_yahoo('USDKRW=X')
-        except Exception as e:
-            failed.append(('USDKRW', str(e)[:60]))
-
-    seen = set()
-    for p in positions:
-        t = p['ticker']
-        if t in seen:
-            continue
-        seen.add(t)
-        if p['sector'] in NONMARKET:
-            out[t] = (num(p['current_price_krw'] or p['avg_price_krw']), 'manual(%s)' % p['sector'])
-            continue
+    out, failed, rows = {}, [], []
+    for i in instruments:
+        t = i['ticker']
+        price = price_krw = src = None
         if do_fetch:
             try:
-                if p['quote_ccy'] == 'KRW':
-                    price, src = fetch_krx(p['quote_symbol'])
+                if i['quote_ccy'] == 'KRW':
+                    price, src = fetch_krx(i['quote_symbol'])
+                    price_krw = price
                 else:
                     if fx is None:
                         raise RuntimeError('환율 없음')
-                    usd, src = fetch_yahoo(p['quote_symbol'])
-                    price, src = usd * fx, '%s×FX%.1f' % (src, fx)
-                out[t] = (price, src)
-                continue
+                    price, src = fetch_yahoo(i['quote_symbol'])
+                    price_krw, src = price * fx, '%s×FX%.1f' % (src, fx)
             except Exception as e:
                 failed.append((t, str(e)[:60]))
-        if t in cache:
-            out[t] = (num(cache[t]['price_krw']), 'cache(%s)' % cache[t].get('asof', '?'))
-        else:
-            raise SystemExit('중단: %s 는 시세도 캐시도 없습니다.' % t)
-
-    rows = [{'ticker': t, 'price_krw': round(v[0], 4), 'asof': asof, 'source': v[1]}
-            for t, v in out.items()]
+        if price is None:
+            if t in last:
+                price = num(last[t]['price'])
+                price_krw = num(last[t]['price_krw'])
+                src = 'cache(%s)' % last[t].get('date', '?')
+            else:
+                failed.append((t, '시세도 캐시도 없음'))
+                continue
+        out[t] = (round(price_krw, 4), src)
+        rows.append({'date': asof, 'ticker': t, 'name': i['name'],
+                     'quote_symbol': i['quote_symbol'], 'quote_ccy': i['quote_ccy'],
+                     'price': round(price, 4), 'price_krw': round(price_krw, 4), 'source': src})
     return out, failed, rows
+
+
+def upsert_price_history(date, rows):
+    keep = [r for r in read_csv('price_history.csv') if r['date'] != date]
+    keep.extend(rows)
+    keep.sort(key=lambda r: (r['date'], r['ticker']))
+    write_csv('price_history.csv', keep, PRICE_HISTORY_COLS)
+
+
+def fetch_yahoo_history(symbol, start, end):
+    """야후 차트 API의 일봉 구간 조회. {'YYYY-MM-DD': 종가} 반환."""
+    period1 = int(datetime.datetime.strptime(start, '%Y-%m-%d').timestamp())
+    period2 = int(datetime.datetime.strptime(end, '%Y-%m-%d').timestamp()) + 86400
+    d = _get_json('https://query1.finance.yahoo.com/v8/finance/chart/%s'
+                  '?period1=%d&period2=%d&interval=1d' % (symbol, period1, period2))
+    result = d['chart']['result'][0]
+    ts = result.get('timestamp') or []
+    closes = result['indicators']['quote'][0]['close']
+    out = {}
+    for t, c in zip(ts, closes):
+        if c is None:
+            continue
+        day = datetime.datetime.utcfromtimestamp(t).strftime('%Y-%m-%d')
+        out[day] = c
+    return out
+
+
+def backfill_prices(start_date, end_date=None):
+    """과거 구간의 일별 종가를 야후에서 소급 조회해 price_history.csv 에 채워 넣는다.
+    이미 있는 (날짜,티커) 조합은 건드리지 않는다 — 실측/라이브 값을 덮어쓰지 않기 위함.
+    국내 종목은 야후에 .KS/.KQ 로 걸려있어 둘 다 시도한다."""
+    end_date = end_date or datetime.date.today().isoformat()
+    positions = read_csv('positions.csv')
+    instruments = instrument_list(positions)
+    existing = read_csv('price_history.csv')
+    existing_keys = {(r['date'], r['ticker']) for r in existing}
+
+    fx_hist = {}
+    if any(i['quote_ccy'] == 'USD' for i in instruments):
+        try:
+            fx_hist = fetch_yahoo_history('USDKRW=X', start_date, end_date)
+        except Exception as e:
+            print('  환율 이력 조회 실패: %s' % str(e)[:80])
+
+    new_rows = []
+    for i in instruments:
+        t = i['ticker']
+        try:
+            if i['quote_ccy'] == 'KRW':
+                hist, used = {}, None
+                for suffix in ('.KS', '.KQ'):
+                    try:
+                        hist = fetch_yahoo_history(i['quote_symbol'] + suffix, start_date, end_date)
+                        if hist:
+                            used = suffix
+                            break
+                    except Exception:
+                        continue
+                if not hist:
+                    print('  스킵(과거 시세 없음): %s' % t)
+                    continue
+                for day, close in hist.items():
+                    if (day, t) in existing_keys:
+                        continue
+                    new_rows.append({'date': day, 'ticker': t, 'name': i['name'],
+                                     'quote_symbol': i['quote_symbol'], 'quote_ccy': 'KRW',
+                                     'price': round(close, 4), 'price_krw': round(close, 4),
+                                     'source': 'backfill(yahoo%s)' % used})
+            else:
+                hist = fetch_yahoo_history(i['quote_symbol'], start_date, end_date)
+                for day, close in hist.items():
+                    if (day, t) in existing_keys:
+                        continue
+                    fx = fx_hist.get(day)
+                    if fx is None:
+                        continue
+                    new_rows.append({'date': day, 'ticker': t, 'name': i['name'],
+                                     'quote_symbol': i['quote_symbol'], 'quote_ccy': 'USD',
+                                     'price': round(close, 4), 'price_krw': round(close * fx, 4),
+                                     'source': 'backfill(yahoo×fx)'})
+        except Exception as e:
+            print('  실패: %s (%s)' % (t, str(e)[:80]))
+
+    all_rows = existing + new_rows
+    all_rows.sort(key=lambda r: (r['date'], r['ticker']))
+    write_csv('price_history.csv', all_rows, PRICE_HISTORY_COLS)
+    print('과거 시세 %d행 추가 (price_history.csv 총 %d행)' % (len(new_rows), len(all_rows)))
 
 
 def update_positions_current_price(prices):
@@ -618,10 +685,15 @@ def main():
     ap.add_argument('--date', help='기록 날짜 (기본: 오늘)')
     ap.add_argument('--emotion', help='오늘의 감정 태그 (예: 탐욕, 공포, 평온)')
     ap.add_argument('--backfill', metavar='XLSX', help='01_일별로그 과거 이력 복원')
+    ap.add_argument('--backfill-prices', metavar='START_DATE',
+                    help='이 날짜부터 오늘까지 종목 종가를 야후에서 소급 조회 (예: 2026-08-01)')
+    ap.add_argument('--backfill-prices-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
     a = ap.parse_args()
 
     if a.backfill:
         return backfill(a.backfill)
+    if a.backfill_prices:
+        return backfill_prices(a.backfill_prices, a.backfill_prices_end)
 
     date = a.date or datetime.date.today().isoformat()
     positions = read_csv('positions.csv')
@@ -631,29 +703,36 @@ def main():
     common = load_cashflow_totals(common)
     rules = read_csv('rules.csv')
 
-    prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)
+    instruments = instrument_list(positions)
+    prices, failed, price_rows = fetch_price_table(instruments, not a.no_fetch, date)
+    for p in positions:                     # 현금/신용은 시장 시세가 없다 — 사람이 적은 값 그대로
+        if p['sector'] in NONMARKET:
+            prices[p['ticker']] = (num(p['current_price_krw'] or p['avg_price_krw']),
+                                   'manual(%s)' % p['sector'])
+
     m, stock_rows = compute(positions, prices, common)
     signals = judge(m, rules)
     macro, macro_failed = load_macro(not a.no_fetch, date)
-    watchlist_rows, watchlist_failed = load_watchlist(not a.no_fetch)
-    report(date, m, signals, failed + macro_failed + watchlist_failed, macro)
-    if watchlist_rows or watchlist_failed:
-        print('  관심종목 %d개 갱신 (%d개 실패)\n' % (len(watchlist_rows), len(watchlist_failed)))
+    report(date, m, signals, failed + macro_failed, macro)
 
     if a.dry:
         print('  (--dry: 저장하지 않았습니다)\n')
         return
-    write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
+    # prices.csv 는 export_to_xlsx.py/rebuild_dashboard_reference.py 가 읽는
+    # "티커→최신 원화가" 스냅샷 포맷을 그대로 유지한다 (price_history.csv 와는 별개).
+    write_csv('prices.csv',
+              [{'ticker': t, 'price_krw': v[0], 'asof': date, 'source': v[1]}
+               for t, v in prices.items()],
+              ['ticker', 'price_krw', 'asof', 'source'])
+    upsert_price_history(date, price_rows)
     update_positions_current_price(prices)
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
     if macro:
         upsert_macro(date, macro)
-    if watchlist_rows:
-        upsert_watchlist_history(date, watchlist_rows)
 
     nonmarket_rows = []
     for p in positions:
-        if p['sector'] not in ('현금', '신용'):
+        if p['sector'] not in NONMARKET:
             continue
         price = prices[p['ticker']][0]
         qty = num(p['qty'])
@@ -661,7 +740,7 @@ def main():
                                     nominal=qty * price, real=qty * price))
     upsert_position_history(date, stock_rows + nonmarket_rows)
 
-    print('  기록 완료 → data/daily.csv, data/macro.csv, data/watchlist_history.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
+    print('  기록 완료 → data/daily.csv, data/macro.csv, data/price_history.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
 
 
 if __name__ == '__main__':
