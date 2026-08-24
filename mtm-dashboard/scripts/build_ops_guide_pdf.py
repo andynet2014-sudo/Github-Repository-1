@@ -9,7 +9,18 @@ from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, Tab
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-FONT_DIR = '/tmp/claude-0/-home-user-260731-/b712c619-9f83-5eb1-85a3-154aeacff8b0/scratchpad'
+import os, urllib.request
+
+FONT_DIR = '/tmp/mtm_ops_guide_fonts'
+os.makedirs(FONT_DIR, exist_ok=True)
+_FONT_URLS = {
+    'NanumGothic-Regular.ttf': 'https://fonts.gstatic.com/s/nanumgothic/v26/PN_3Rfi-oW3hYwmKDpxS7F_z_g.ttf',
+    'NanumGothic-Bold.ttf': 'https://fonts.gstatic.com/s/nanumgothic/v26/PN_oRfi-oW3hYwmKDpxS7F_LQv37zg.ttf',
+}
+for _fname, _url in _FONT_URLS.items():
+    _path = os.path.join(FONT_DIR, _fname)
+    if not os.path.exists(_path):
+        urllib.request.urlretrieve(_url, _path)
 pdfmetrics.registerFont(TTFont('NanumGothic', f'{FONT_DIR}/NanumGothic-Regular.ttf'))
 pdfmetrics.registerFont(TTFont('NanumGothic-Bold', f'{FONT_DIR}/NanumGothic-Bold.ttf'))
 
@@ -19,7 +30,7 @@ REG = 'NanumGothic'
 VERSION = 'v1.02'
 DATE = '2026-08-23'
 
-OUT = f'/tmp/claude-0/-home-user-260731-/b712c619-9f83-5eb1-85a3-154aeacff8b0/scratchpad/output/MtM_Dashboard_운영가이드_{VERSION}.pdf'
+OUT = f'/tmp/MtM_Dashboard_운영가이드_{VERSION}.pdf'
 
 styles = {
     'title': ParagraphStyle('title', fontName=BOLD, fontSize=17, leading=21,

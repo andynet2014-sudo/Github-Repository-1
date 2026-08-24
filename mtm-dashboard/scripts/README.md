@@ -15,6 +15,11 @@
   상태 — 재실행할 필요는 없고, "월말 스냅샷 + 신용값을 daily.csv에 병합하는 방식"의
   예시로만 참고할 것.
 - **`build_ops_guide_pdf.py`** — `MtM_Dashboard_운영가이드_v1.0x.pdf`를 만든 스크립트.
-  한글 폰트는 Google Fonts에서 받은 Nanum Gothic(레포엔 없음, 스크립트 상단에서
-  런타임에 다운로드) 사용. CLAUDE.md/DECISIONS.md 내용이 바뀌면 이 스크립트의 본문
-  텍스트도 같이 고치고 `VERSION`을 올려 재실행할 것.
+  한글 폰트는 Google Fonts의 Nanum Gothic을 스크립트 실행 시 자동 다운로드(레포엔
+  폰트 파일 없음, `pip install reportlab` 필요). CLAUDE.md/DECISIONS.md 내용이 바뀌면
+  이 스크립트의 본문 텍스트도 같이 고치고 `VERSION`을 올려 재실행할 것. 실행 검증 완료
+  (2026-08-24).
+- **`build_numbers_template.py`** — 사용자가 국장/ISA 일별 잔고를 수기로 채워 넣는
+  Numbers 템플릿 생성 스크립트(`pip install numbers_parser` 필요). `START`/`END`
+  날짜 범위만 바꿔서 다음 분기용 템플릿을 새로 뽑을 때 재사용. 실행 검증 완료
+  (2026-08-24).
