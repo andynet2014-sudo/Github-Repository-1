@@ -116,6 +116,47 @@ def fetch_yahoo(symbol):
     return float(d['chart']['result'][0]['meta']['regularMarketPrice']), 'yahoo'
 
 
+# ─────────────────────────── 매크로 지표 ───────────────────────────
+# 야후 파이낸스 티커. ^TNX(미국채10y)는 %값의 10배로 나와서 배율로 나눠준다.
+MACRO_TICKERS = {
+    'us10y': ('^TNX', 10),
+    'wti': ('CL=F', 1),
+    'kospi': ('^KS11', 1),
+    'kosdaq': ('^KQ11', 1),
+}
+MACRO_COLS = ['date', 'us10y', 'wti', 'kospi', 'kosdaq', 'source']
+
+
+def load_macro(do_fetch, asof):
+    """매크로 지표를 야후에서 조회. 실패하면 macro.csv의 가장 최근 값으로 대체한다."""
+    hist = read_csv('macro.csv')
+    last = hist[-1] if hist else {}
+    out, failed = {}, []
+    for key, (symbol, div) in MACRO_TICKERS.items():
+        if do_fetch:
+            try:
+                v, _ = fetch_yahoo(symbol)
+                out[key] = v / div
+                continue
+            except Exception as e:
+                failed.append((symbol, str(e)[:60]))
+        if key in last and last[key] not in ('', None):
+            out[key] = num(last[key])
+    return out, failed
+
+
+def upsert_macro(date, values):
+    rows = [r for r in read_csv('macro.csv') if r['date'] != date]
+    row = {'date': date, 'source': 'live'}
+    for k in ('us10y', 'wti', 'kospi', 'kosdaq'):
+        v = values.get(k)
+        row[k] = round(v, 4) if v is not None else ''
+    rows.append(row)
+    rows.sort(key=lambda r: r['date'])
+    write_csv('macro.csv', rows, MACRO_COLS)
+    return row
+
+
 def load_prices(positions, do_fetch, asof):
     """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다.
 
@@ -355,7 +396,7 @@ def fmt(key, v):
     return '{:,.0f}'.format(v)
 
 
-def report(date, m, signals, failed):
+def report(date, m, signals, failed, macro=None):
     W = 62
     print('\n━━━ %s ' % date + '━' * (W - len(date) - 5))
     print('  계좌 순자산 (Equity)   %20s' % '{:,.0f}'.format(m['equity']))
@@ -385,6 +426,16 @@ def report(date, m, signals, failed):
               % (rid, label, fmt(key, cur), fmt(key, thr) if thr is not None else '—', sig, note))
     bad = sum(1 for s in signals if s[4].startswith('🔴'))
     print('\n  위반 %d건 / %d건' % (bad, len(signals)))
+    if macro:
+        print('\n━━━ 매크로 ' + '━' * (W - 10))
+        if 'us10y' in macro:
+            print('  미국채 10y금리         %19s' % ('%.2f%%' % macro['us10y']))
+        if 'wti' in macro:
+            print('  WTI 선물               %19s' % ('$%.2f' % macro['wti']))
+        if 'kospi' in macro:
+            print('  KOSPI                  %19s' % ('{:,.2f}'.format(macro['kospi'])))
+        if 'kosdaq' in macro:
+            print('  KOSDAQ                 %19s' % ('{:,.2f}'.format(macro['kosdaq'])))
     if failed:
         print('\n  ⚠ 시세 조회 실패 — 캐시로 대체했습니다:')
         for t, e in failed:
@@ -538,7 +589,8 @@ def main():
     prices, failed, price_rows = load_prices(positions, not a.no_fetch, date)
     m, stock_rows = compute(positions, prices, common)
     signals = judge(m, rules)
-    report(date, m, signals, failed)
+    macro, macro_failed = load_macro(not a.no_fetch, date)
+    report(date, m, signals, failed + macro_failed, macro)
 
     if a.dry:
         print('  (--dry: 저장하지 않았습니다)\n')
@@ -546,6 +598,8 @@ def main():
     write_csv('prices.csv', price_rows, ['ticker', 'price_krw', 'asof', 'source'])
     update_positions_current_price(prices)
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
+    if macro:
+        upsert_macro(date, macro)
 
     nonmarket_rows = []
     for p in positions:
@@ -557,7 +611,7 @@ def main():
                                     nominal=qty * price, real=qty * price))
     upsert_position_history(date, stock_rows + nonmarket_rows)
 
-    print('  기록 완료 → data/daily.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
+    print('  기록 완료 → data/daily.csv, data/macro.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
 
 
 if __name__ == '__main__':
