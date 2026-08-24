@@ -158,6 +158,50 @@ def upsert_macro(date, values):
     return row
 
 
+# ─────────────────────────── 관심종목(워치리스트) ───────────────────────────
+# positions.csv 와 달리 수량·평단이 없다 — 손익·리스크 계산에는 안 들어가고,
+# 그냥 매일 종가만 watchlist_history.csv 에 쌓는다. 사람이 watchlist.csv 에
+# 티커를 추가/삭제하면 다음 실행부터 반영된다.
+WATCHLIST_HISTORY_COLS = ['date', 'ticker', 'name', 'price', 'ccy', 'price_krw', 'source']
+
+
+def load_watchlist(do_fetch):
+    rows = read_csv('watchlist.csv')
+    if not rows or not do_fetch:
+        return [], []
+    fx = None
+    if any(r['quote_ccy'] == 'USD' for r in rows):
+        try:
+            fx, _ = fetch_yahoo('USDKRW=X')
+        except Exception:
+            pass
+    out, failed = [], []
+    for r in rows:
+        try:
+            if r['quote_ccy'] == 'KRW':
+                price, src = fetch_krx(r['quote_symbol'])
+                price_krw = price
+            else:
+                price, src = fetch_yahoo(r['quote_symbol'])
+                price_krw = price * fx if fx else None
+        except Exception as e:
+            failed.append((r['ticker'], str(e)[:60]))
+            continue
+        out.append({'ticker': r['ticker'], 'name': r['name'], 'price': round(price, 4),
+                    'ccy': r['quote_ccy'],
+                    'price_krw': round(price_krw, 2) if price_krw is not None else '',
+                    'source': src})
+    return out, failed
+
+
+def upsert_watchlist_history(date, rows):
+    keep = [r for r in read_csv('watchlist_history.csv') if r['date'] != date]
+    for r in rows:
+        keep.append({'date': date, **r})
+    keep.sort(key=lambda r: (r['date'], r['ticker']))
+    write_csv('watchlist_history.csv', keep, WATCHLIST_HISTORY_COLS)
+
+
 def load_prices(positions, do_fetch, asof):
     """{ticker: (원화가격, 출처)}. 실패한 종목은 캐시로 대체하고 목록을 함께 돌려준다.
 
@@ -591,7 +635,10 @@ def main():
     m, stock_rows = compute(positions, prices, common)
     signals = judge(m, rules)
     macro, macro_failed = load_macro(not a.no_fetch, date)
-    report(date, m, signals, failed + macro_failed, macro)
+    watchlist_rows, watchlist_failed = load_watchlist(not a.no_fetch)
+    report(date, m, signals, failed + macro_failed + watchlist_failed, macro)
+    if watchlist_rows or watchlist_failed:
+        print('  관심종목 %d개 갱신 (%d개 실패)\n' % (len(watchlist_rows), len(watchlist_failed)))
 
     if a.dry:
         print('  (--dry: 저장하지 않았습니다)\n')
@@ -601,6 +648,8 @@ def main():
     upsert_daily(date, m, signals, 'live' if not a.no_fetch else 'cache', emotion=a.emotion)
     if macro:
         upsert_macro(date, macro)
+    if watchlist_rows:
+        upsert_watchlist_history(date, watchlist_rows)
 
     nonmarket_rows = []
     for p in positions:
@@ -612,7 +661,7 @@ def main():
                                     nominal=qty * price, real=qty * price))
     upsert_position_history(date, stock_rows + nonmarket_rows)
 
-    print('  기록 완료 → data/daily.csv, data/macro.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
+    print('  기록 완료 → data/daily.csv, data/macro.csv, data/watchlist_history.csv, data/prices.csv, data/positions.csv(현재가), data/positions_history.csv\n')
 
 
 if __name__ == '__main__':
