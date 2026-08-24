@@ -1,9 +1,0 @@
-date,ticker,name,price,ccy,price_krw,source
-2026-08-25,EWY,iShares MSCI South Korea ETF,174.57,USD,241288.91,yahoo
-2026-08-25,KRX:003230,삼양식품,1404000.0,KRW,1404000.0,naver
-2026-08-25,KRX:005935,삼성전자우,189300.0,KRW,189300.0,naver
-2026-08-25,KRX:032830,삼성생명,285500.0,KRW,285500.0,naver
-2026-08-25,MU,Micron Technology,916.708,USD,1267064.63,yahoo
-2026-08-25,QQQ,Invesco QQQ Trust,708.44,USD,979198.68,yahoo
-2026-08-25,SKHY,SKHY,156.02,USD,215649.28,yahoo
-2026-08-25,SOXX,iShares Semiconductor ETF,508.15,USD,702359.85,yahoo
