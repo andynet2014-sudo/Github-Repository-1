@@ -41,7 +41,17 @@ jobs:
           git add mtm-dashboard/data/price_history.csv
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 생략"
-          else
-            git commit -m "종가 소급 백필 (${{ github.event.inputs.start_date }} ~ ${{ github.event.inputs.end_date }})"
-            git push
+            exit 0
           fi
+          git commit -m "종가 소급 백필 (${{ github.event.inputs.start_date }} ~ ${{ github.event.inputs.end_date }})"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push 실패 — main이 그새 움직임, rebase 후 재시도 ($i/5)"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 3))
+          done
+          echo "::error::5회 재시도 후에도 push 실패"
+          exit 1
