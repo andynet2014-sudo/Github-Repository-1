@@ -74,7 +74,8 @@ def signal_tier(direction, value, warn, threshold, bad):
 
 def build_signals(m, rules):
     metrics = dict(m)
-    metrics['stop_violations'] = metrics['stop_missing'] + metrics['stop_below']
+    metrics['stop_violations'] = (metrics['stop_missing'] + metrics['stop_at_cost']
+                                  + metrics['stop_below'])
     out = []
     for r in rules:
         rid = r['id']
