@@ -226,11 +226,11 @@ date,ticker,name,quote_symbol,quote_ccy,price,price_krw,source
 2026-08-24,EWY,iShares MSCI South Korea ETF,EWY,USD,174.765,241581.1446,backfill(yahoo×fx)
 2026-08-24,KRX:0193T0,SK하이닉스X2,0193T0,KRW,9915.0,9915.0,backfill(yahoo.KS)
 2026-08-24,KRX:0193W0,삼성전자X2,0193W0,KRW,11705.0,11705.0,backfill(yahoo.KS)
-2026-08-24,MRVL,Marvell Technology,MRVL,USD,231.19,319578.5518,backfill(yahoo×fx)
+2026-08-24,MRVL,Marvell Technology,MRVL,USD,229.29,316924.638,user(정규장종가 확인)
 2026-08-24,MU,Micron Technology,MU,USD,917.48,1268250.8773,backfill(yahoo×fx)
 2026-08-24,QQQ,Invesco QQQ Trust,QQQ,USD,708.39,979221.647,backfill(yahoo×fx)
 2026-08-24,SKHY,SK하이닉스(ADR),SKHY,USD,156.14,215835.4356,backfill(yahoo×fx)
-2026-08-24,SOXL,Direxion Daily Semiconductor Bull 3X,SOXL,USD,112.6,155649.2238,backfill(yahoo×fx)
+2026-08-24,SOXL,Direxion Daily Semiconductor Bull 3X,SOXL,USD,111.16,153645.352,user(정규장종가 확인)
 2026-08-24,SOXX,iShares Semiconductor ETF,SOXX,USD,508.67,703144.7056,backfill(yahoo×fx)
 2026-08-25,EWY,iShares MSCI South Korea ETF,EWY,USD,174.88,241726.1312,yahoo×FX1382.2
 2026-08-25,KRX:000660,SK하이닉스(신용),000660,KRW,1671000.0,1671000.0,naver
