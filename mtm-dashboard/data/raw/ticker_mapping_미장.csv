@@ -1,0 +1,92 @@
+name,ticker,confidence,note
+AST 스페이스모바일,ASTS,high,
+GE 버노바,GEV,high,
+L3 해리스 테크놀러지스,LHX,high,
+MP 머터리얼즈,MP,high,
+SPDR 금 미니셰어즈 ETF,GLDM,high,
+TRADR 2X LONG CRDO DAILY ETF,,low,T-Rex/Tradr 계열 CRDO 2배 상품 — 정확한 티커 확인 필요
+TRADR AAOI 2배 ETF,,low,확인 필요
+TRADR AST 스페이스모바일 2배 ETF,,low,확인 필요
+TRADR GE 버노바 2배 ETF,,low,확인 필요
+TRADR 루멘텀 홀딩스 2배 ETF,,low,확인 필요
+TRADR 블룸 에너지 2배 ETF,,low,확인 필요
+TRADR 샌디스크 2배 ETF,,low,확인 필요
+TRADR 앱러빈 2배 ETF,,low,확인 필요
+TRADR 크레도 테크놀로지 2배 ETF,,low,확인 필요 (위 CRDO 2배와 동일 상품일 가능성)
+TSMC(타이완반도체제조),TSM,high,
+그래닛셰어즈 MRVL 데일리 2배 ETF,,low,확인 필요
+그래닛셰어즈 엔비디아 데일리 2배 ETF,NVDL,medium,GraniteShares 2x Long NVDA Daily ETF — 비교적 확신
+그래닛셰어즈 인텔 데일리 2배 ETF,,low,확인 필요
+노스롭 그루만,NOC,high,
+데이터도그,DDOG,high,
+델타 에어라인스,DAL,high,
+디렉시온 마이크로소프트 2배 ETF,MSFU,medium,
+디렉시온 마이크론 테크놀로지 2배 ETF,,low,확인 필요
+디렉시온 메타 2배 ETF,METU,medium,
+디렉시온 반도체 3배 ETF,SOXL,high,
+디렉시온 브로드컴 2배 ETF,,low,확인 필요
+디렉시온 아마존 2배 ETF,AMZU,medium,
+디렉시온 알파벳 A 2배 ETF,,low,확인 필요 (GGLL 추정)
+디렉시온 타이완반도체 2배 ETF,,low,확인 필요
+디렉시온 팔란티어 2배 ETF,PLTU,medium,
+디파이언스 양자컴퓨터 ETF,QTUM,medium,
+레버리지셰어즈 ARM 2배 ETF,,low,확인 필요
+레버리지셰어즈 GE버노바 2배 ETF,,low,확인 필요
+레버리지셰어즈 블룸에너지 2배 ETF,,low,확인 필요
+레버리지셰어즈 테라다인 2배 ETF,,low,확인 필요
+로블록스,RBLX,high,
+로빈후드,HOOD,high,
+로켓 랩,RKLB,high,
+로켓 컴퍼니스,RKT,high,
+루멘텀 홀딩스,LITE,high,
+마벨 테크놀로지 그룹,MRVL,high,
+마이크로소프트,MSFT,high,
+마이크론 테크놀로지,MU,high,
+메타,META,high,
+바이킹 홀딩스,VIK,high,
+발레로 에너지,VLO,high,
+버티브 홀딩스,VRT,high,
+벤처 글로벌,VG,high,
+브로드컴,AVGO,high,
+블룸 에너지,BE,high,
+비트코인 전략 2배 ETF,BITX,medium,ProShares 2x Bitcoin Strategy ETF 추정
+사우스웨스트 에어라인스,LUV,high,
+삼성전자,KRX:005930,high,미장 계좌에서 발생한 코스피 매매(원화) — 국장 종목과 동일 취급
+샌디스크,SNDK,high,
+샤오펑 ADR,XPEV,high,
+센트러스 에너지,LEU,high,
+스페이스X,,low,비상장사 — 실제 거래 내역 재확인 필요(오분류 가능성)
+스포티파이 테크놀러지,SPOT,high,
+아마존닷컴,AMZN,high,
+아이렌,IREN,high,
+아이셰어즈 0-3개월 미국 국채 ETF,SGOV,high,
+아이셰어즈 1-3년 미국 국채 ETF,SHY,high,
+아이셰어즈 20+년 미국 국채 ETF,TLT,high,
+아이셰어즈 7-10년 미국 국채 ETF,IEF,high,
+아처 에비에이션,ACHR,high,
+알리바바 그룹 홀딩 ADR,BABA,high,
+알몬티 인더스트리스,AII,medium,
+알파벳 Class A,GOOGL,high,
+암 홀딩스 ADR,ARM,high,
+앱러빈,APP,high,
+어플라이드 옵토일렉트로닉스,AAOI,high,
+에머슨 일렉트릭,EMR,high,
+엔비디아,NVDA,high,
+오라클,ORCL,high,
+오클로,OKLO,high,
+온 홀딩,ONON,high,
+웨스턴 디지털,WDC,high,
+이튼,ETN,high,
+인텔,INTC,high,
+일라이 릴리,LLY,high,
+코히런트,COHR,high,
+크레도 테크놀로지 그룹 홀딩,CRDO,high,
+클라우드플레어,NET,high,
+테라다인,TER,high,
+테슬라,TSLA,high,
+템퍼스 AI,TEM,high,
+티렉스 로빈후드 타겟 2배 ETF,HOOX,medium,
+팔란티어 테크놀로지스,PLTR,high,
+퍼스트 머제스틱 실버,AG,high,
+허드베이 미네랄,HBM,high,
+헌팅턴 잉걸스 인더스트리즈,HII,high,
