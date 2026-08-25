@@ -1,0 +1,46 @@
+name: 2026 보유기간 가격 테이블 백필
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 보유기간 시세 백필
+        run: |
+          cd mtm-dashboard
+          python3 backfill_holding_prices.py
+
+      - name: 결과 커밋 & push
+        run: |
+          git config user.name "mtm-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add mtm-dashboard/data/raw/csv/holding_prices_2026.csv mtm-dashboard/data/raw/csv/holding_prices_2026_실패.csv
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+            exit 0
+          fi
+          git commit -m "2026 보유기간 가격 테이블 백필"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push 실패 — main이 그새 움직임, rebase 후 재시도 ($i/5)"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 3))
+          done
+          echo "::error::5회 재시도 후에도 push 실패"
+          exit 1
