@@ -114,7 +114,12 @@ def main():
     common = {r['key']: r['value'] for r in collect.read_csv('common.csv')}
     common = collect.load_cashflow_totals(common)
     rules = collect.read_csv('rules.csv')
-    prices, failed, fx = collect.load_prices(positions, False, a.date)
+    instruments = collect.instrument_list(positions)
+    prices, failed, price_rows = collect.fetch_price_table(instruments, False, a.date)
+    for p in positions:
+        if p['sector'] in collect.NONMARKET:
+            prices[p['ticker']] = (collect.num(p['current_price_krw'] or p['avg_price_krw']),
+                                   'manual(%s)' % p['sector'])
     m, rows_all = collect.compute(positions, prices, common)
     signals = build_signals(m, rules)
     pos_list = build_positions(rows_all)
