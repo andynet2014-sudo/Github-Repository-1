@@ -396,12 +396,24 @@ def compute(positions, prices, common):
     top_sector, top_sector_val = max(sector.items(), key=lambda x: x[1]) if sector else ('', 0)
 
     # 손절: 현재가가 손절가 위인 종목만 손실이 잡힌다 (아래면 이미 하회 → 0)
+    # stop_price_krw 가 avg_price_krw 와 사실상 같으면(0.1% 이내) '평단을 손절가 칸에
+    # 복사만 해둔 것' — 실손절가를 정한 게 아니다. 그런 값을 진짜 손절가로 세면
+    # R04/R05 가 "손절 관리 잘 되고 있음"으로 잘못 읽힌다 (README 참고: 8/9종목이 이 상태).
+    # 그래서 stop_missing(공란)과 별도로 stop_at_cost(본전=손절가, 사실상 미설정)를 센다.
+    def has_real_stop(r):
+        sp = r['stop_price_krw']
+        if sp in ('', None):
+            return False
+        avg = num(r['avg_price_krw'])
+        return not (avg and abs(num(sp) - avg) / avg < 0.001)
+
     stop_missing = sum(1 for r in rows if r['stop_price_krw'] in ('', None))
+    stop_at_cost = sum(1 for r in rows
+                       if r['stop_price_krw'] not in ('', None) and not has_real_stop(r))
     stop_below = sum(1 for r in rows
-                     if r['stop_price_krw'] not in ('', None)
-                     and r['price'] < num(r['stop_price_krw']))
+                     if has_real_stop(r) and r['price'] < num(r['stop_price_krw']))
     stop_loss = sum(max(0.0, (r['price'] - num(r['stop_price_krw'])) * r['qty'])
-                    for r in rows if r['stop_price_krw'] not in ('', None))
+                    for r in rows if has_real_stop(r))
 
     lev_etf_nominal = sum(r['nominal'] for r in rows if r['lev'] > 1)
     salary = num(common['salary'])
@@ -432,6 +444,7 @@ def compute(positions, prices, common):
         'max_sector': div(top_sector_val, expo_real),                   # B59
         'max_sector_name': top_sector,
         'stop_missing': stop_missing, 'stop_below': stop_below,         # B60/B61
+        'stop_at_cost': stop_at_cost,          # 본전가=손절가로 등록된, 사실상 미설정 종목 수
         'n_credit': sum(1 for r in rows if r['uses_credit'] == 'Y'),    # B62
         'stop_loss': stop_loss,                                         # B63
         'stop_loss_ratio': div(stop_loss, own),                         # B64
@@ -464,15 +477,21 @@ RULE_MAP = {
     'R06': ('max_sector', 'max', '섹터쏠림'),
     'R07': ('lev_etf_ratio', 'max', '레버ETF과다'),
     'R08': ('debt_to_salary', 'max', '빚과다'),
+    'R10': ('max_pos', 'max', '단일종목쏠림'),
 }
 # 시트 R07 은 기준값 칸이 비어 있어 항상 '준수'로 판정됩니다. 경고값(0.05)이
 # 상한으로 쓰기엔 지나치게 낮아, 계좌 순자산의 50%를 잠정 기준으로 둡니다.
+# R10(단일종목 쏠림)은 rules.csv 에 근거 있는 기준값이 채워지기 전까지 잠정치를
+# 두지 않습니다 — 임계값을 지어내는 대신 '측정불가'로 정직하게 비워 둡니다.
 FALLBACK_THRESHOLD = {'R07': 0.5}
 
 
 def judge(metrics, rules):
     metrics = dict(metrics)
-    metrics['stop_violations'] = metrics['stop_missing'] + metrics['stop_below']
+    # stop_at_cost(본전가=손절가, 사실상 미설정)도 '손절 관리 위반'에 포함한다 —
+    # 안 그러면 R04가 실제로는 손절선이 없는 종목들을 '준수'로 잘못 읽는다.
+    metrics['stop_violations'] = (metrics['stop_missing'] + metrics['stop_at_cost']
+                                  + metrics['stop_below'])
     out = []
     for r in rules:
         rid = r['id']
@@ -494,7 +513,7 @@ def judge(metrics, rules):
 
 # ─────────────────────────── 출력 ───────────────────────────
 
-PCT = {'liq_room', 'cash_ratio', 'max_sector', 'stop_loss_ratio', 'lev_etf_ratio'}
+PCT = {'liq_room', 'cash_ratio', 'max_sector', 'stop_loss_ratio', 'lev_etf_ratio', 'max_pos'}
 MULT = {'lev_real', 'debt_to_salary'}
 
 
@@ -548,6 +567,11 @@ def report(date, m, signals, failed, macro=None):
             print('  KOSPI                  %19s' % ('{:,.2f}'.format(macro['kospi'])))
         if 'kosdaq' in macro:
             print('  KOSDAQ                 %19s' % ('{:,.2f}'.format(macro['kosdaq'])))
+    if m['stop_at_cost']:
+        print('  ※ %d종목은 손절가가 평단가와 동일 — 실손절가 미설정으로 간주해 R04에 포함,'
+              % m['stop_at_cost'])
+        print('    R05(한방리스크) 총손실 계산에서는 제외했습니다. positions.csv 의'
+              ' stop_price_krw 를 실제 손절가로 바꾸면 반영됩니다.')
     if failed:
         print('\n  ⚠ 시세 조회 실패 — 캐시로 대체했습니다:')
         for t, e in failed:
@@ -561,7 +585,7 @@ DAILY_COLS = ['date', 'equity', 'own_equity', 'expo_real', 'nominal_sum', 'cash'
               'credit', 'implied_lev', 'debt', 'lev_real', 'lev_account',
               'margin_ratio', 'liq_room', 'cash_ratio', 'debt_ratio',
               'max_sector', 'max_sector_name', 'max_pos', 'stop_below',
-              'stop_missing', 'stop_loss', 'stop_loss_ratio', 'debt_to_salary',
+              'stop_missing', 'stop_at_cost', 'stop_loss', 'stop_loss_ratio', 'debt_to_salary',
               'surface_pnl', 'net_pnl', 'net_return',
               'violations', '국장_total', '국장_equity', '미장_equity', 'ISA_equity',
               'emotion', 'source']
