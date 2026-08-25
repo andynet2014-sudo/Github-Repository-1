@@ -4,36 +4,36 @@ GE 버노바,GEV,high,
 L3 해리스 테크놀러지스,LHX,high,
 MP 머터리얼즈,MP,high,
 SPDR 금 미니셰어즈 ETF,GLDM,high,
-TRADR 2X LONG CRDO DAILY ETF,,low,T-Rex/Tradr 계열 CRDO 2배 상품 — 정확한 티커 확인 필요
-TRADR AAOI 2배 ETF,,low,확인 필요
-TRADR AST 스페이스모바일 2배 ETF,,low,확인 필요
-TRADR GE 버노바 2배 ETF,,low,확인 필요
-TRADR 루멘텀 홀딩스 2배 ETF,,low,확인 필요
-TRADR 블룸 에너지 2배 ETF,,low,확인 필요
-TRADR 샌디스크 2배 ETF,,low,확인 필요
-TRADR 앱러빈 2배 ETF,,low,확인 필요
-TRADR 크레도 테크놀로지 2배 ETF,,low,확인 필요 (위 CRDO 2배와 동일 상품일 가능성)
+TRADR 2X LONG CRDO DAILY ETF,CRDU,medium,"Tradr 2X Long CRDO Daily ETF (Cboe) — 웹검색 확인, 사용자 컨펌 대기"
+TRADR AAOI 2배 ETF,AAOX,medium,"Tradr 2X Long AAOI Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR AST 스페이스모바일 2배 ETF,ASTX,medium,"Tradr 2X Long ASTS Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR GE 버노바 2배 ETF,GEVX,medium,"Tradr 2X Long GEV Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR 루멘텀 홀딩스 2배 ETF,LITX,medium,"Tradr 2X Long LITE Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR 블룸 에너지 2배 ETF,BEX,medium,"Tradr 2X Long BE Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR 샌디스크 2배 ETF,SNXX,medium,"Tradr 2X Long SNDK Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR 앱러빈 2배 ETF,APPX,medium,"Tradr 2X Long APP Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+TRADR 크레도 테크놀로지 2배 ETF,CRDU,medium,CRDO 2배 ETF와 동일 상품 추정(중복 표기) — 사용자 컨펌 대기
 TSMC(타이완반도체제조),TSM,high,
-그래닛셰어즈 MRVL 데일리 2배 ETF,,low,확인 필요
+그래닛셰어즈 MRVL 데일리 2배 ETF,MVLL,medium,"GraniteShares 2x Long MRVL Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
 그래닛셰어즈 엔비디아 데일리 2배 ETF,NVDL,medium,GraniteShares 2x Long NVDA Daily ETF — 비교적 확신
-그래닛셰어즈 인텔 데일리 2배 ETF,,low,확인 필요
+그래닛셰어즈 인텔 데일리 2배 ETF,INTW,medium,"GraniteShares 2x Long INTC Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
 노스롭 그루만,NOC,high,
 데이터도그,DDOG,high,
 델타 에어라인스,DAL,high,
 디렉시온 마이크로소프트 2배 ETF,MSFU,medium,
-디렉시온 마이크론 테크놀로지 2배 ETF,,low,확인 필요
+디렉시온 마이크론 테크놀로지 2배 ETF,MUU,medium,"Direxion Daily MU Bull 2X Shares — 웹검색 확인, 사용자 컨펌 대기"
 디렉시온 메타 2배 ETF,METU,medium,
 디렉시온 반도체 3배 ETF,SOXL,high,
-디렉시온 브로드컴 2배 ETF,,low,확인 필요
+디렉시온 브로드컴 2배 ETF,AVL,medium,"Direxion Daily AVGO Bull 2X Shares — 웹검색 확인, 사용자 컨펌 대기"
 디렉시온 아마존 2배 ETF,AMZU,medium,
-디렉시온 알파벳 A 2배 ETF,,low,확인 필요 (GGLL 추정)
-디렉시온 타이완반도체 2배 ETF,,low,확인 필요
+디렉시온 알파벳 A 2배 ETF,GGLL,medium,"Direxion Daily GOOGL Bull 2X Shares — 웹검색 확인, 사용자 컨펌 대기"
+디렉시온 타이완반도체 2배 ETF,TSMX,medium,"Direxion Daily TSM Bull 2X Shares — 웹검색 확인, 사용자 컨펌 대기"
 디렉시온 팔란티어 2배 ETF,PLTU,medium,
 디파이언스 양자컴퓨터 ETF,QTUM,medium,
-레버리지셰어즈 ARM 2배 ETF,,low,확인 필요
-레버리지셰어즈 GE버노바 2배 ETF,,low,확인 필요
-레버리지셰어즈 블룸에너지 2배 ETF,,low,확인 필요
-레버리지셰어즈 테라다인 2배 ETF,,low,확인 필요
+레버리지셰어즈 ARM 2배 ETF,ARMG,medium,"Leverage Shares 2X Long ARM Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+레버리지셰어즈 GE버노바 2배 ETF,GEVG,medium,"Leverage Shares 2x Long GEV Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+레버리지셰어즈 블룸에너지 2배 ETF,BEG,medium,"Leverage Shares 2x Long BE Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
+레버리지셰어즈 테라다인 2배 ETF,TERG,medium,"Leverage Shares 2X Long TER Daily ETF — 웹검색 확인, 사용자 컨펌 대기"
 로블록스,RBLX,high,
 로빈후드,HOOD,high,
 로켓 랩,RKLB,high,
@@ -55,7 +55,7 @@ TSMC(타이완반도체제조),TSM,high,
 샌디스크,SNDK,high,
 샤오펑 ADR,XPEV,high,
 센트러스 에너지,LEU,high,
-스페이스X,,low,비상장사 — 실제 거래 내역 재확인 필요(오분류 가능성)
+스페이스X,SPCX,medium,"SpaceX 2026년 나스닥 상장 후 티커 — 웹검색 확인, 사용자 컨펌 대기(비상장 시절 거래였는지 재확인 필요)"
 스포티파이 테크놀러지,SPOT,high,
 아마존닷컴,AMZN,high,
 아이렌,IREN,high,
