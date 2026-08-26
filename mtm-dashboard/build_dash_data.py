@@ -129,10 +129,27 @@ def main():
     lev_breakdown = build_lev_breakdown(rows_stock)
     acct_expo = build_acct_expo(rows_stock)
 
-    daily = {row['date']: row for row in collect.read_csv('daily.csv')}
+    daily_rows = collect.read_csv('daily.csv')
+    daily = {row['date']: row for row in daily_rows}
     today_row = daily[a.date]
-    prior_date = prev['date']
-    prior_row = daily.get(prior_date, {})
+
+    # "전일비" 라벨은 계좌 3개 전체에 공통으로 쓰인다(대시보드가 계좌별 날짜를
+    # 따로 표시하지 못함) — 그래서 어느 한 계좌라도 그날 실측이 안 됐으면(공란)
+    # 그 날짜를 prior_date로 못 쓴다. 세 계좌 모두 실측치가 있는 가장 최근 과거
+    # 날짜를 찾아써서, "전일비"라고 적어놓고 실제로는 며칠 전과 비교하는 상황을
+    # 막는다.
+    def has_all_accounts(row):
+        return all(collect.num(row.get(acct + '_equity', ''), None) is not None
+                   for acct in ('국장', '미장', 'ISA'))
+
+    prior_date = None
+    for d_str in sorted(daily.keys(), reverse=True):
+        if d_str >= a.date:
+            continue
+        if has_all_accounts(daily[d_str]):
+            prior_date = d_str
+            break
+    prior_row = daily.get(prior_date, {}) if prior_date else {}
 
     principal = {'국장': collect.num(common.get('principal_국장', 0)),
                  '미장': collect.num(common.get('principal_미장', 0)),
@@ -164,6 +181,10 @@ def main():
     d['hero_by_account'] = hero_by_account
     d['hero_total_dod'] = total_dod
     d['hero_net_total'] = m['net_pnl']
+    d['cashflow'] = [{'date': r['date'], 'type': r['type'], 'from_account': r['from_account'],
+                      'to_account': r['to_account'], 'amount': collect.num(r['amount']),
+                      'memo': r['memo'], 'entry_via': r['entry_via']}
+                     for r in collect.read_csv('cashflow.csv')]
 
     series_point = {'date': a.date, 'equity': m['equity'], 'kr_eq': m['국장_equity'],
                     'liq_room': m['liq_room'], 'cash_ratio': m['cash_ratio'],
