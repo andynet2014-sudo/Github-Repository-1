@@ -438,7 +438,7 @@
 <div class="page">
 
   <header>
-    <p class="eyebrow">MtM Dashboard · 260731 · v1.05</p>
+    <p class="eyebrow">MtM Dashboard · 260731 · v1.06</p>
     <h1>MtM Dashboard</h1>
     <div class="subline">
       <span id="dateLabel"></span>
@@ -637,6 +637,8 @@ const m = DATA.metrics;
     const principal = principalByAcct[a.account];
     const taxRow = a.account === '미장'
       ? `<div class="ap-sub"><span>※ 예상세액</span><span class="ap-sub-v num">${FMT.n(m.cum_tax_est)}원</span></div>` : '';
+    const interestRow = a.account === '국장'
+      ? `<div class="ap-sub"><span>※ 누적신용이자</span><span class="ap-sub-v num">${FMT.n(m.cum_interest)}원</span></div>` : '';
     return `
       <div class="acct-pnl-item">
         <div class="ap-name">${a.account}</div>
@@ -644,7 +646,7 @@ const m = DATA.metrics;
         <span class="ap-dod num ${a.dod >= 0 ? 'pos' : 'neg'}">${a.dod != null ? `(${dodLabel} ${a.dod >= 0 ? '+' : ''}${FMT.n(a.dod)})` : ''}</span>
         <div class="ap-sub"><span>${equityLabel}</span><span class="ap-sub-v num">${equity != null ? FMT.n(equity) + '원' : '—'}</span></div>
         <div class="ap-sub"><span>기준원금</span><span class="ap-sub-v num">${principal != null ? FMT.n(principal) + '원' : '—'}</span></div>
-        ${taxRow}
+        ${taxRow}${interestRow}
       </div>`;
   }).join('');
   document.getElementById('hero').innerHTML = `
@@ -658,7 +660,6 @@ const m = DATA.metrics;
       <div class="bd-item">표면 누적손익<b class="num">${FMT.n(m.surface_pnl)}원</b></div>
       <div class="bd-item">(−) 강의·구독비<b class="num">${FMT.n(m.cum_course_fees)}원</b></div>
       <div class="bd-item">(−) 해외주식 예상세액<b class="num">${FMT.n(m.cum_tax_est)}원</b></div>
-      <div class="bd-item">참고: 누적 지급이자<b class="num">${FMT.n(m.cum_interest)}원</b></div>
     </div>
     <div class="acct-pnl-row">${acctRow}</div>`;
 }
