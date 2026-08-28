@@ -28,16 +28,36 @@ jobs:
       - name: 대상 날짜(KST) 계산
         id: date
         run: |
+          # github.event.schedule 문자열을 cron 표현과 그대로 비교하는 방식은
+          # GitHub Actions 스케줄 발동 시각이 조금만 어긋나도(드리프트로 흔함)
+          # 매칭에 실패해 엉뚱한 날짜로 커밋되는 사고가 반복됐다(2026-08-28).
+          # 대신 발동된 실제 KST 시각으로 판단한다 — 정오 이전이면 "새벽 미장
+          # 마감" 실행으로 보고 전날 날짜로 합치고, 정오 이후면 "당일 국장
+          # 마감" 실행으로 오늘 날짜를 쓴다. 스케줄 시각이 몇 시간 밀려도 안전.
           if [ -n "${{ github.event.inputs.date }}" ]; then
             echo "target=${{ github.event.inputs.date }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "0 22 * * 1-5" ]; then
-            # 새벽 07:00 KST 실행 = 전날 국장 마감분과 같은 거래일로 합침
-            echo "target=$(TZ='Asia/Seoul' date -d yesterday +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
           else
-            echo "target=$(TZ='Asia/Seoul' date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            HOUR=$(TZ='Asia/Seoul' date +%H)
+            if [ "$HOUR" -lt 12 ]; then
+              echo "target=$(TZ='Asia/Seoul' date -d yesterday +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            else
+              echo "target=$(TZ='Asia/Seoul' date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: 주말이면 스킵 (거래 없는 날 기록 방지)
+        id: skip
+        run: |
+          DOW=$(TZ='Asia/Seoul' date -d "${{ steps.date.outputs.target }}" +%u)   # 6=토 7=일
+          if [ -z "${{ github.event.inputs.date }}" ] && [ "$DOW" -ge 6 ]; then
+            echo "대상 날짜(${{ steps.date.outputs.target }})가 주말 — 스킵"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: collect.py 실행
+        if: steps.skip.outputs.skip != 'true'
         run: |
           cd mtm-dashboard
           python3 collect.py --date "${{ steps.date.outputs.target }}"
