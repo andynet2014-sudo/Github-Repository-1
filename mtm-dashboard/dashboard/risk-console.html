@@ -136,6 +136,7 @@
   .ap-sub .ap-sub-v { color: var(--ink-2); font-weight: 600; }
   .hero-cob { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: .02em; margin-bottom: 2px; }
   .hero .value-block { display: flex; flex-direction: column; }
+  .value-surface { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; color: var(--good); opacity: .55; margin-bottom: 2px; }
   .hero .hero-dod-line { margin-top: 2px; }
 
   /* ---------- monthly ---------- */
@@ -651,13 +652,14 @@ const m = DATA.metrics;
   }).join('');
   document.getElementById('hero').innerHTML = `
     <div class="value-block">
+      <div class="label">표면 누적손익</div>
+      <div class="value-surface num">${m.surface_pnl >= 0 ? '+' : ''}${FMT.n(m.surface_pnl)}원</div>
       <div class="label">실질 누적 순손익 <span class="sourcetag">03_Cashflow Ⅴ</span></div>
       <div class="hero-cob">${cobLabel}</div>
       <div class="value ${netPos ? 'pos' : 'neg'} num">${netPos ? '+' : ''}${FMT.n(heroNetTotal)}원</div>
       ${dodLine(DATA.hero_total_dod)}
     </div>
     <div class="breakdown">
-      <div class="bd-item">표면 누적손익<b class="num">${FMT.n(m.surface_pnl)}원</b></div>
       <div class="bd-item">(−) 강의·구독비<b class="num">${FMT.n(m.cum_course_fees)}원</b></div>
       <div class="bd-item">(−) 해외주식 예상세액<b class="num">${FMT.n(m.cum_tax_est)}원</b></div>
     </div>
