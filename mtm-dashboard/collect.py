@@ -324,11 +324,13 @@ def backfill_prices(start_date, end_date=None):
 
 
 def backfill_macro(start_date, end_date=None):
-    """MACRO_TICKERS 전체를 야후에서 소급 조회해 macro.csv 의 없는 날짜만 채운다.
-    이미 있는 날짜(라이브로 이미 기록된 날)는 건드리지 않는다."""
+    """MACRO_TICKERS 전체를 야후에서 소급 조회해 macro.csv 를 채운다.
+    없는 날짜는 새 행을 만들고, 이미 있는 날짜는 **빈 칸인 항목만** 채운다
+    (예: 나중에 새 지표가 추가되기 전 날짜라 그 칸만 비어 있는 경우) —
+    이미 값이 있는 칸은 절대 덮어쓰지 않는다."""
     end_date = end_date or datetime.date.today().isoformat()
     existing = read_csv('macro.csv')
-    existing_dates = {r['date'] for r in existing}
+    by_date = {r['date']: dict(r) for r in existing}
 
     hist_by_key = {}
     for key, (symbol, div) in MACRO_TICKERS.items():
@@ -344,20 +346,26 @@ def backfill_macro(start_date, end_date=None):
     for h in hist_by_key.values():
         all_dates |= set(h.keys())
 
-    new_rows = []
+    added, filled = 0, 0
     for d in sorted(all_dates):
-        if d in existing_dates:
-            continue
-        row = {'date': d, 'source': 'backfill(yahoo)'}
+        if d not in by_date:
+            by_date[d] = {'date': d, 'source': 'backfill(yahoo)'}
+            for key in MACRO_TICKERS:
+                by_date[d][key] = ''
+            added += 1
+        row = by_date[d]
         for key in MACRO_TICKERS:
+            if row.get(key) not in ('', None):
+                continue
             v = hist_by_key.get(key, {}).get(d)
-            row[key] = round(v, 4) if v is not None else ''
-        new_rows.append(row)
+            if v is not None:
+                row[key] = round(v, 4)
+                filled += 1
 
-    all_rows = existing + new_rows
-    all_rows.sort(key=lambda r: r['date'])
+    all_rows = sorted(by_date.values(), key=lambda r: r['date'])
     write_csv('macro.csv', all_rows, MACRO_COLS)
-    print('과거 매크로 %d행 추가 (macro.csv 총 %d행)' % (len(new_rows), len(all_rows)))
+    print('과거 매크로: 새 날짜 %d행 추가, 기존 행 빈 칸 %d개 보완 (macro.csv 총 %d행)'
+          % (added, filled, len(all_rows)))
 
 
 def update_positions_current_price(prices):
