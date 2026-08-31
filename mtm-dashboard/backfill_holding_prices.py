@@ -61,12 +61,14 @@ def merged_windows(rows):
             merged[key][1] = None
         elif end > cur_end:
             merged[key][1] = end
-    # 2026-01-01 이전 시작은 분석 범위(2026년)에 맞춰 자른다
+    # 2026-01-01 이전 시작은 분석 범위(2026년)에 맞춰 자른다.
+    # 종료는 항상 오늘까지 연장한다 — 완전청산 종목도 "매도 후 가격이
+    # 어떻게 됐는지"를 봐야 매매 타이밍 평가가 가능하기 때문
+    # (보유 안 한 기간의 가격도 일부 포함되지만, 종목 수가 적어 비용은 무시할 만함).
     out = []
     for (account, name), (start, end) in merged.items():
         start = max(start, '2026-01-01')
-        end = end or TODAY
-        out.append({'account': account, 'name': name, 'start': start, 'end': end})
+        out.append({'account': account, 'name': name, 'start': start, 'end': TODAY})
     return out
 
 
