@@ -43,7 +43,7 @@
 | `data/price_history.csv` | (신규, 원래 시트에 없음) | **가격 마스터 테이블.** 실보유 포지션이든 관심종목(watchlist)이든, 시세가 필요한 모든 티커의 날짜별 종가를 이 한 파일에만 쌓는다(`date,ticker,name,quote_symbol,quote_ccy,price,price_krw,source`). positions.csv/watchlist.csv 는 "무엇을 추적할지"만 정의하고 실제 가격 조회·저장은 여기서 한 번에 처리 — 같은 종목을 두 곳에서 중복으로 조회하지 않는다. 손대지 않음 |
 | `data/daily.csv` | 01_일별로그 | 계좌 합계(순자산·레버리지·손익 등) 이력, 하루 한 줄. 손대지 않음 |
 | `data/positions_history.csv` | (신규, 원래 시트에 없음) | **종목별** 이력. `positions.csv`는 매번 덮어써져서 과거를 못 보므로, 실행할 때마다 그날 종목별 수량·평단·현재가·손익을 `date+ticker+account` 키로 쌓는다. 손대지 않음 |
-| `data/macro.csv` | (신규, 원래 시트에 없음) | 매크로 지표(미국채10y금리·WTI·KOSPI·KOSDAQ) 일별 이력. 야후 파이낸스에서 자동 조회, 실패하면 전날 값 유지. 손대지 않음 |
+| `data/macro.csv` | (신규, 원래 시트에 없음) | 매크로 지표(KOSPI·KOSDAQ·NASDAQ·NASDAQ선물·필라델피아반도체(SOX)·미국채10y금리·원/달러·엔/달러·WTI·GOLD) 일별 이력. 야후 파이낸스에서 자동 조회, 실패하면 전날 값 유지. 손대지 않음 |
 | `data/watchlist.csv` | (신규, 원래 시트에 없음) | **사람이 만지는 파일.** 관심종목 목록(수량·평단 없음, 순수 시세 추적용). `ticker,name,quote_symbol,quote_ccy` 컬럼 — positions.csv에 없는 종목만 추가. 실보유 포지션과 손익·리스크 계산에는 들어가지 않지만, 시세는 `price_history.csv`에 똑같이 쌓인다 |
 
 **즉 매매·리스크 숫자는 이 폴더, 일지·의견·회고는 구글시트.** 헷갈리면 이 표로 돌아오면 된다.

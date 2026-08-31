@@ -124,8 +124,14 @@ MACRO_TICKERS = {
     'wti': ('CL=F', 1),
     'kospi': ('^KS11', 1),
     'kosdaq': ('^KQ11', 1),
+    'nasdaq': ('^IXIC', 1),
+    'nasdaq_futures': ('NQ=F', 1),
+    'sox': ('^SOX', 1),           # 필라델피아반도체지수 (SOXX는 이 지수를 추종하는 ETF, watchlist에 별도)
+    'usdkrw': ('USDKRW=X', 1),
+    'usdjpy': ('JPY=X', 1),
+    'gold': ('GC=F', 1),
 }
-MACRO_COLS = ['date', 'us10y', 'wti', 'kospi', 'kosdaq', 'source']
+MACRO_COLS = ['date'] + list(MACRO_TICKERS.keys()) + ['source']
 
 
 def load_macro(do_fetch, asof):
@@ -149,7 +155,7 @@ def load_macro(do_fetch, asof):
 def upsert_macro(date, values):
     rows = [r for r in read_csv('macro.csv') if r['date'] != date]
     row = {'date': date, 'source': 'live'}
-    for k in ('us10y', 'wti', 'kospi', 'kosdaq'):
+    for k in MACRO_TICKERS:
         v = values.get(k)
         row[k] = round(v, 4) if v is not None else ''
     rows.append(row)
@@ -559,14 +565,23 @@ def report(date, m, signals, failed, macro=None):
     print('\n  위반 %d건 / %d건' % (bad, len(signals)))
     if macro:
         print('\n━━━ 매크로 ' + '━' * (W - 10))
-        if 'us10y' in macro:
-            print('  미국채 10y금리         %19s' % ('%.2f%%' % macro['us10y']))
-        if 'wti' in macro:
-            print('  WTI 선물               %19s' % ('$%.2f' % macro['wti']))
-        if 'kospi' in macro:
-            print('  KOSPI                  %19s' % ('{:,.2f}'.format(macro['kospi'])))
-        if 'kosdaq' in macro:
-            print('  KOSDAQ                 %19s' % ('{:,.2f}'.format(macro['kosdaq'])))
+        MACRO_LABELS = [
+            ('kospi', 'KOSPI', '{:,.2f}'),
+            ('kosdaq', 'KOSDAQ', '{:,.2f}'),
+            ('nasdaq', 'NASDAQ', '{:,.2f}'),
+            ('nasdaq_futures', 'NASDAQ 선물', '{:,.2f}'),
+            ('sox', '필라델피아반도체(SOX)', '{:,.2f}'),
+            ('us10y', '미국채 10y금리', '%.2f%%'),
+            ('usdkrw', '원/달러 환율', '{:,.2f}'),
+            ('usdjpy', '엔/달러 환율', '{:,.2f}'),
+            ('wti', 'WTI 선물', '$%.2f'),
+            ('gold', 'GOLD', '$%.2f'),
+        ]
+        for key, label, fmt_str in MACRO_LABELS:
+            if key in macro:
+                val = macro[key]
+                shown = fmt_str % val if '%' in fmt_str else fmt_str.format(val)
+                print('  %-22s %19s' % (label, shown))
     if m['stop_at_cost']:
         print('  ※ %d종목은 손절가가 평단가와 동일 — 실손절가 미설정으로 간주해 R04에 포함,'
               % m['stop_at_cost'])
