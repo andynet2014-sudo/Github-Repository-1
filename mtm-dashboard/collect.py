@@ -323,6 +323,43 @@ def backfill_prices(start_date, end_date=None):
     print('과거 시세 %d행 추가 (price_history.csv 총 %d행)' % (len(new_rows), len(all_rows)))
 
 
+def backfill_macro(start_date, end_date=None):
+    """MACRO_TICKERS 전체를 야후에서 소급 조회해 macro.csv 의 없는 날짜만 채운다.
+    이미 있는 날짜(라이브로 이미 기록된 날)는 건드리지 않는다."""
+    end_date = end_date or datetime.date.today().isoformat()
+    existing = read_csv('macro.csv')
+    existing_dates = {r['date'] for r in existing}
+
+    hist_by_key = {}
+    for key, (symbol, div) in MACRO_TICKERS.items():
+        try:
+            h = fetch_yahoo_history(symbol, start_date, end_date)
+            hist_by_key[key] = {d: v / div for d, v in h.items()}
+            print('  %-16s %d일치 조회' % (key, len(h)))
+        except Exception as e:
+            print('  실패: %s (%s)' % (key, str(e)[:80]))
+            hist_by_key[key] = {}
+
+    all_dates = set()
+    for h in hist_by_key.values():
+        all_dates |= set(h.keys())
+
+    new_rows = []
+    for d in sorted(all_dates):
+        if d in existing_dates:
+            continue
+        row = {'date': d, 'source': 'backfill(yahoo)'}
+        for key in MACRO_TICKERS:
+            v = hist_by_key.get(key, {}).get(d)
+            row[key] = round(v, 4) if v is not None else ''
+        new_rows.append(row)
+
+    all_rows = existing + new_rows
+    all_rows.sort(key=lambda r: r['date'])
+    write_csv('macro.csv', all_rows, MACRO_COLS)
+    print('과거 매크로 %d행 추가 (macro.csv 총 %d행)' % (len(new_rows), len(all_rows)))
+
+
 def update_positions_current_price(prices):
     """positions.csv 의 current_price_krw 열을 오늘 시세로 덮어쓴다.
 
@@ -727,12 +764,17 @@ def main():
     ap.add_argument('--backfill-prices', metavar='START_DATE',
                     help='이 날짜부터 오늘까지 종목 종가를 야후에서 소급 조회 (예: 2026-08-01)')
     ap.add_argument('--backfill-prices-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
+    ap.add_argument('--backfill-macro', metavar='START_DATE',
+                    help='이 날짜부터 오늘까지 매크로 지표를 야후에서 소급 조회 (예: 2026-01-01)')
+    ap.add_argument('--backfill-macro-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
     a = ap.parse_args()
 
     if a.backfill:
         return backfill(a.backfill)
     if a.backfill_prices:
         return backfill_prices(a.backfill_prices, a.backfill_prices_end)
+    if a.backfill_macro:
+        return backfill_macro(a.backfill_macro, a.backfill_macro_end)
 
     date = a.date or datetime.date.today().isoformat()
     positions = read_csv('positions.csv')
