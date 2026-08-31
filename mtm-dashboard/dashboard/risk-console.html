@@ -135,8 +135,10 @@
   .ap-sub + .ap-sub { margin-top: 3px; padding-top: 0; border-top: none; }
   .ap-sub .ap-sub-v { color: var(--ink-2); font-weight: 600; }
   .hero-cob { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: .02em; margin-bottom: 2px; }
+  .hero-cob-inline { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: .01em; }
   .hero .value-block { display: flex; flex-direction: column; }
   .value-surface { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; color: var(--good); opacity: .55; margin-bottom: 2px; }
+  .bd-item-real { color: var(--good) !important; opacity: .6; }
   .hero .hero-dod-line { margin-top: 2px; }
 
   /* ---------- monthly ---------- */
@@ -629,7 +631,9 @@ const m = DATA.metrics;
   const dodLabel = '전일比';
   const dodLine = v => v == null ? '' :
     `<span class="hero-dod ${v >= 0 ? 'pos' : 'neg'} hero-dod-line">(${dodLabel} ${v >= 0 ? '+' : ''}${FMT.n(v)}원)</span>`;
-  const cobLabel = 'CoB ' + (+DATA.date.slice(5, 7)) + '/' + (+DATA.date.slice(8, 10));
+  const WEEKDAY_KR = ['일', '월', '화', '수', '목', '금', '토'];
+  const cobDate = new Date(DATA.date + 'T00:00:00');
+  const cobLabel = 'CoB ' + (+DATA.date.slice(5, 7)) + '/' + (+DATA.date.slice(8, 10)) + ', ' + WEEKDAY_KR[cobDate.getDay()] + '요일';
   const acctRow = byAcct.map(a => {
     const equityLabel = a.account === '국장' ? '총평가액(신용차감후)' : '총평가액';
     const dispVal = a.account === '미장' ? a.surface_pnl : a.net_pnl;
@@ -652,14 +656,12 @@ const m = DATA.metrics;
   }).join('');
   document.getElementById('hero').innerHTML = `
     <div class="value-block">
-      <div class="label">표면 누적손익</div>
+      <div class="label">표면 누적손익 <span class="hero-cob-inline">(${cobLabel})</span></div>
       <div class="value-surface num">${m.surface_pnl >= 0 ? '+' : ''}${FMT.n(m.surface_pnl)}원</div>
-      <div class="label">실질 누적 순손익 <span class="sourcetag">03_Cashflow Ⅴ</span></div>
-      <div class="hero-cob">${cobLabel}</div>
-      <div class="value ${netPos ? 'pos' : 'neg'} num">${netPos ? '+' : ''}${FMT.n(heroNetTotal)}원</div>
       ${dodLine(DATA.hero_total_dod)}
     </div>
     <div class="breakdown">
+      <div class="bd-item"><span>실질 누적 순손익</span><b class="num bd-item-real">${netPos ? '+' : ''}${FMT.n(heroNetTotal)}원</b></div>
       <div class="bd-item">(−) 강의·구독비<b class="num">${FMT.n(m.cum_course_fees)}원</b></div>
       <div class="bd-item">(−) 해외주식 예상세액<b class="num">${FMT.n(m.cum_tax_est)}원</b></div>
     </div>
