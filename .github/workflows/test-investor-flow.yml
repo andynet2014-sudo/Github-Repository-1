@@ -7,30 +7,38 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Naver 외국인/기관 순매매 테이블 파싱 테스트
+      - name: Naver 시장 전체 투자자별 매매동향 테스트
         run: |
           python3 <<'EOF'
           import urllib.request, re
 
           headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
-
-          for code, name in [('005930', '삼성전자'), ('000660', 'SK하이닉스')]:
-              url = f'https://finance.naver.com/item/frgn.naver?code={code}&page=1'
-              req = urllib.request.Request(url, headers=headers)
+          url = 'https://finance.naver.com/sise/sise_deposit.naver'
+          req = urllib.request.Request(url, headers=headers)
+          try:
               with urllib.request.urlopen(req, timeout=10) as r:
                   body = r.read().decode('euc-kr', errors='replace')
-              # 실제 데이터 테이블: class="type2" 를 가진 두 번째 table
-              tables = re.findall(r'<table[^>]*class="type2"[^>]*>.*?</table>', body, re.S)
-              print(f'=== {name}: type2 테이블 {len(tables)}개 발견 ===')
-              if len(tables) >= 2:
-                  # 두번째가 일별 매매동향 테이블인 경우가 많음
-                  t = tables[1] if len(tables) > 1 else tables[0]
-                  rows = re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S)
-                  for row in rows[:15]:
-                      cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
-                      cells = [re.sub('<.*?>', '', c).strip() for c in cells]
-                      cells = [c for c in cells if c]
-                      if cells:
-                          print(cells)
-              print()
+                  print('sise_deposit status', r.status, len(body))
+          except Exception as e:
+              print('실패:', repr(e))
+
+          # 실제로 찾는 페이지: 투자자별 매매동향 (금액)
+          url2 = 'https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260831'
+          req2 = urllib.request.Request(url2, headers=headers)
+          try:
+              with urllib.request.urlopen(req2, timeout=10) as r:
+                  body2 = r.read().decode('euc-kr', errors='replace')
+                  print('investorDealTrendDay status', r.status, len(body2))
+                  tables = re.findall(r'<table[^>]*>.*?</table>', body2, re.S)
+                  print('테이블 개수:', len(tables))
+                  if tables:
+                      rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tables[0], re.S)
+                      for row in rows[:20]:
+                          cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+                          cells = [re.sub('<.*?>', '', c).strip() for c in cells]
+                          cells = [c for c in cells if c]
+                          if cells:
+                              print(cells)
+          except Exception as e:
+              print('investorDealTrendDay 실패:', repr(e))
           EOF
