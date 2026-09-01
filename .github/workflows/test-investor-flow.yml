@@ -7,26 +7,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Naver 시장 전체 투자자별 매매동향 - 헤더 확인
+      - name: 개별 종목 기타법인 포함 금액 breakdown 탐색
         run: |
           python3 <<'EOF'
           import urllib.request, re
 
           headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
-          for market_label, url in [
-              ('기본(파라미터 없음)', 'https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260831'),
-          ]:
-              req = urllib.request.Request(url, headers=headers)
-              with urllib.request.urlopen(req, timeout=10) as r:
-                  body = r.read().decode('euc-kr', errors='replace')
-              # th 헤더 텍스트 전부 추출
-              ths = re.findall(r'<th[^>]*>(.*?)</th>', body, re.S)
-              ths = [re.sub('<.*?>', ' ', t).strip() for t in ths]
-              ths = [t for t in ths if t]
-              print(f'=== {market_label} th 목록 ===')
-              print(ths)
 
-              # KOSPI/KOSDAQ 구분 있는지 select box 옵션 확인
-              opts = re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)</option>', body)
-              print('select option들:', opts[:20])
+          candidates = [
+              'https://finance.naver.com/item/investorDealTrend.naver?code=005930',
+              'https://finance.naver.com/item/investorDealTrendDay.naver?code=005930',
+              'https://finance.naver.com/item/frgn.naver?code=005930&frgn_switch=1',
+              'https://m.stock.naver.com/api/stock/005930/investorTrend',
+              'https://m.stock.naver.com/api/domestic/stock/005930/trend/foreign',
+              'https://m.stock.naver.com/front-api/frgn/foreignerAndInstitutionsTrend?stockCode=005930',
+          ]
+          for url in candidates:
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=8) as r:
+                      body = r.read()
+                      print(f'{url}\n  -> status {r.status}, 길이 {len(body)}, 앞부분: {body[:200]!r}\n')
+              except Exception as e:
+                  print(f'{url}\n  -> 실패: {repr(e)}\n')
           EOF
