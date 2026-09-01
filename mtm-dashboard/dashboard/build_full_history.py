@@ -96,7 +96,7 @@ def main():
     end = datetime.datetime.strptime(data['date'], '%Y-%m-%d').date()
     dates = business_days(start, end)
 
-    full_pnl, full_eq, full_expo, full_credit, full_lev_real = [], [], [], [], []
+    full_pnl, full_eq, full_own, full_expo, full_credit, full_lev_real = [], [], [], [], [], []
     full_pnl_acct = {acct: [] for acct in TRACKED}
     ev_idx = {acct: 0 for acct in TRACKED}
     principal_by_acct = {acct: 0.0 for acct in TRACKED}
@@ -108,6 +108,7 @@ def main():
                 ev_idx[acct] += 1
         row = daily.get(d)
         eq = num(row['equity']) if row else None
+        own = num(row.get('own_equity')) if row else None
         credit = num(row['credit']) if row else None
         expo = num(row['expo_real']) if row else None
         lev = num(row['lev_real']) if row else None
@@ -115,6 +116,7 @@ def main():
         pnl = (eq - principal_total) if eq is not None else None
         full_pnl.append({'date': d, 'v': pnl})
         full_eq.append({'date': d, 'v': eq})
+        full_own.append({'date': d, 'v': own})
         full_expo.append({'date': d, 'v': expo})
         full_credit.append({'date': d, 'v': credit})
         full_lev_real.append({'date': d, 'v': lev})
@@ -137,6 +139,7 @@ def main():
 
     data['full_pnl'] = full_pnl
     data['full_eq'] = full_eq
+    data['full_own'] = full_own
     data['full_expo'] = full_expo
     data['full_credit'] = full_credit
     data['full_lev_real'] = full_lev_real
