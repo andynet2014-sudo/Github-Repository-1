@@ -7,48 +7,36 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: KRX raw 요청 진단
+      - name: Naver 외국인/기관 순매매 테스트
         run: |
           python3 <<'EOF'
-          import urllib.request, urllib.parse
+          import urllib.request
 
-          headers = {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-              'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020103',
-          }
+          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
 
-          # 1) OTP 발급 요청
-          otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
-          otp_params = {
-              'locale': 'ko_KR',
-              'mktId': 'STK',
-              'strtDd': '20260827',
-              'endDd': '20260831',
-              'isuCd': 'KR7005930003',
-              'param1isuCd_finder_stkisu0_0': '',
-              'trdVolVal': 'trdVal',
-              'askBid': '3',
-              'name': 'fileDown',
-              'url': 'dbms/MDC/STAT/standard/MDCSTAT02203',
-          }
-          req = urllib.request.Request(otp_url + '?' + urllib.parse.urlencode(otp_params), headers=headers)
-          try:
-              with urllib.request.urlopen(req, timeout=10) as r:
-                  otp = r.read()
-                  print('OTP status:', r.status)
-                  print('OTP body (앞 300자):', otp[:300])
-          except Exception as e:
-              print('OTP 요청 실패:', repr(e))
-              otp = None
-
-          if otp:
-              down_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
-              req2 = urllib.request.Request(down_url, data=urllib.parse.urlencode({'code': otp}).encode(), headers={**headers, 'Content-Type': 'application/x-www-form-urlencoded'})
+          for code, name in [('005930', '삼성전자'), ('000660', 'SK하이닉스')]:
+              url = f'https://finance.naver.com/item/frgn.naver?code={code}&page=1'
+              req = urllib.request.Request(url, headers=headers)
               try:
-                  with urllib.request.urlopen(req2, timeout=10) as r:
-                      body = r.read()
-                      print('DOWNLOAD status:', r.status)
-                      print('DOWNLOAD body (앞 500자):', body[:500])
+                  with urllib.request.urlopen(req, timeout=10) as r:
+                      body = r.read().decode('euc-kr', errors='replace')
+                      print(f'=== {name} status {r.status}, 길이 {len(body)} ===')
+                      # 테이블 부분만 대충 잘라서 확인
+                      idx = body.find('외국인')
+                      print(body[idx-200:idx+1500] if idx > 0 else '외국인 문자열 못찾음')
               except Exception as e:
-                  print('DOWNLOAD 요청 실패:', repr(e))
+                  print(f'{name} 실패:', repr(e))
+              print()
+
+          # 모바일 API 버전도 시도 (JSON)
+          for code, name in [('005930', '삼성전자')]:
+              url = f'https://m.stock.naver.com/api/stock/{code}/investorTrend?page=1&pageSize=5'
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=10) as r:
+                      body = r.read()
+                      print(f'=== 모바일 API {name} status {r.status} ===')
+                      print(body[:1000])
+              except Exception as e:
+                  print(f'모바일 API {name} 실패:', repr(e))
           EOF
