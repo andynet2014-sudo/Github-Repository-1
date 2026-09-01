@@ -7,38 +7,26 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Naver 시장 전체 투자자별 매매동향 테스트
+      - name: Naver 시장 전체 투자자별 매매동향 - 헤더 확인
         run: |
           python3 <<'EOF'
           import urllib.request, re
 
           headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
-          url = 'https://finance.naver.com/sise/sise_deposit.naver'
-          req = urllib.request.Request(url, headers=headers)
-          try:
+          for market_label, url in [
+              ('기본(파라미터 없음)', 'https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260831'),
+          ]:
+              req = urllib.request.Request(url, headers=headers)
               with urllib.request.urlopen(req, timeout=10) as r:
                   body = r.read().decode('euc-kr', errors='replace')
-                  print('sise_deposit status', r.status, len(body))
-          except Exception as e:
-              print('실패:', repr(e))
+              # th 헤더 텍스트 전부 추출
+              ths = re.findall(r'<th[^>]*>(.*?)</th>', body, re.S)
+              ths = [re.sub('<.*?>', ' ', t).strip() for t in ths]
+              ths = [t for t in ths if t]
+              print(f'=== {market_label} th 목록 ===')
+              print(ths)
 
-          # 실제로 찾는 페이지: 투자자별 매매동향 (금액)
-          url2 = 'https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=20260831'
-          req2 = urllib.request.Request(url2, headers=headers)
-          try:
-              with urllib.request.urlopen(req2, timeout=10) as r:
-                  body2 = r.read().decode('euc-kr', errors='replace')
-                  print('investorDealTrendDay status', r.status, len(body2))
-                  tables = re.findall(r'<table[^>]*>.*?</table>', body2, re.S)
-                  print('테이블 개수:', len(tables))
-                  if tables:
-                      rows = re.findall(r'<tr[^>]*>(.*?)</tr>', tables[0], re.S)
-                      for row in rows[:20]:
-                          cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
-                          cells = [re.sub('<.*?>', '', c).strip() for c in cells]
-                          cells = [c for c in cells if c]
-                          if cells:
-                              print(cells)
-          except Exception as e:
-              print('investorDealTrendDay 실패:', repr(e))
+              # KOSPI/KOSDAQ 구분 있는지 select box 옵션 확인
+              opts = re.findall(r'<option[^>]*value="([^"]*)"[^>]*>([^<]*)</option>', body)
+              print('select option들:', opts[:20])
           EOF
