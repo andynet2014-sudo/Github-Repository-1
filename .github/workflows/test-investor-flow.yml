@@ -1,0 +1,36 @@
+name: TEST pykrx 투자자별 순매수 조회
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Naver 외국인/기관 순매매 테이블 파싱 테스트
+        run: |
+          python3 <<'EOF'
+          import urllib.request, re
+
+          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+
+          for code, name in [('005930', '삼성전자'), ('000660', 'SK하이닉스')]:
+              url = f'https://finance.naver.com/item/frgn.naver?code={code}&page=1'
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  body = r.read().decode('euc-kr', errors='replace')
+              # 실제 데이터 테이블: class="type2" 를 가진 두 번째 table
+              tables = re.findall(r'<table[^>]*class="type2"[^>]*>.*?</table>', body, re.S)
+              print(f'=== {name}: type2 테이블 {len(tables)}개 발견 ===')
+              if len(tables) >= 2:
+                  # 두번째가 일별 매매동향 테이블인 경우가 많음
+                  t = tables[1] if len(tables) > 1 else tables[0]
+                  rows = re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S)
+                  for row in rows[:15]:
+                      cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+                      cells = [re.sub('<.*?>', '', c).strip() for c in cells]
+                      cells = [c for c in cells if c]
+                      if cells:
+                          print(cells)
+              print()
+          EOF
