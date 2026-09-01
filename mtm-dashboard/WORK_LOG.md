@@ -83,3 +83,19 @@
 - 스케줄 정상 발동(07:03 KST), 8/31 미장 6종목 정상 반영: SOXL $112.79, SKHY $164.58,
   MU $958.73, QQQ $716.76, EWY $180.86, SOXX $511.04. 9/1 오염 없음.
 - 상태: 완료, 문제 없음.
+
+### 2026-09-01 09:xx (KST) — main (투자자별 순매수 데이터 소스 조사)
+- 요청: 삼성전자/SK하이닉스/코스피 순매수금액 + 삼전·SK하닉 기타법인(자사주매입 프록시)
+  추이 확보 가능성 조사.
+- 결과:
+  - KRX 공식 API(`data.krx.co.kr`, `pykrx`): 로그인 세션 필요 — 무인증 자동 요청 불가
+    (OTP 발급 단계에서 `"LOGOUT"` 응답 후 403). 코드로 해결 불가, KRX_ID/KRX_PW 필요.
+  - `finance.naver.com/sise/investorDealTrendDay.naver?bizdate=YYYYMMDD`: **코스피 시장
+    전체** 투자자별 순매수 "금액"(억원) 확보 가능, 기타법인 포함 전체 10개 주체 분리됨.
+    8/27·8/28·8/31 실측 확인 완료.
+  - `finance.naver.com/item/frgn.naver?code=005930`: 개별 종목 기관/외국인 순매매
+    "수량"(주)은 확보 가능하나, 금액 환산 불가 + 기타법인 별도 분리 없음(기관 합산치만).
+  - 개별 종목 단위의 금액+기타법인 분리 소스는 추가 탐색(investorDealTrend(Day).naver
+    ?code=, m.stock.naver.com API 3종) 결과 전부 404 — 무료/비인증 경로로는 확인 불가.
+  - 임시 조사용 `.github/workflows/test-investor-flow.yml` 삭제(조사 종료).
+- 상태: 조사 완료, 사용자에게 결과 보고 및 진행 방향 확인 필요.
