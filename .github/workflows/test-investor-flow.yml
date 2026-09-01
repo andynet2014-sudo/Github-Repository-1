@@ -7,45 +7,48 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: pykrx 설치
-        run: pip install pykrx
-
-      - name: pykrx 버전/함수 시그니처 확인
-        run: |
-          python3 -c "
-          import pykrx, inspect
-          from pykrx import stock
-          print('pykrx version:', pykrx.__version__ if hasattr(pykrx,'__version__') else '?')
-          print(inspect.signature(stock.get_market_trading_value_by_date))
-          print(inspect.signature(stock.get_market_trading_value_by_investor))
-          "
-
-      - name: 투자자별 순매수 테스트 (detail 없이)
+      - name: KRX raw 요청 진단
         run: |
           python3 <<'EOF'
-          from pykrx import stock
-          import pandas as pd
-          pd.set_option('display.max_columns', None)
-          pd.set_option('display.width', 200)
+          import urllib.request, urllib.parse
 
-          FROM, TO = '20260827', '20260831'
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+              'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020103',
+          }
 
-          for name, code in [('삼성전자', '005930'), ('SK하이닉스', '000660')]:
-              print(f"\n=== {name}({code}) 투자자별 순매수대금 (detail 없음) ===")
-              try:
-                  df = stock.get_market_trading_value_by_date(FROM, TO, code)
-                  print(df)
-              except Exception as e:
-                  print("에러:", repr(e))
-
-          print("\n=== KOSPI 지수 투자자별 순매수대금 (get_market_trading_value_by_investor, 단일일자 8/29) ===")
+          # 1) OTP 발급 요청
+          otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
+          otp_params = {
+              'locale': 'ko_KR',
+              'mktId': 'STK',
+              'strtDd': '20260827',
+              'endDd': '20260831',
+              'isuCd': 'KR7005930003',
+              'param1isuCd_finder_stkisu0_0': '',
+              'trdVolVal': 'trdVal',
+              'askBid': '3',
+              'name': 'fileDown',
+              'url': 'dbms/MDC/STAT/standard/MDCSTAT02203',
+          }
+          req = urllib.request.Request(otp_url + '?' + urllib.parse.urlencode(otp_params), headers=headers)
           try:
-              df = stock.get_market_trading_value_by_investor('20260828', '20260828', 'KOSPI')
-              print(df)
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  otp = r.read()
+                  print('OTP status:', r.status)
+                  print('OTP body (앞 300자):', otp[:300])
           except Exception as e:
-              print("에러:", repr(e))
+              print('OTP 요청 실패:', repr(e))
+              otp = None
+
+          if otp:
+              down_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
+              req2 = urllib.request.Request(down_url, data=urllib.parse.urlencode({'code': otp}).encode(), headers={**headers, 'Content-Type': 'application/x-www-form-urlencoded'})
+              try:
+                  with urllib.request.urlopen(req2, timeout=10) as r:
+                      body = r.read()
+                      print('DOWNLOAD status:', r.status)
+                      print('DOWNLOAD body (앞 500자):', body[:500])
+              except Exception as e:
+                  print('DOWNLOAD 요청 실패:', repr(e))
           EOF
