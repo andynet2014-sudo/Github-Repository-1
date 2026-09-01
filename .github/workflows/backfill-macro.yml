@@ -1,0 +1,57 @@
+name: MtM 매크로 지표 소급 백필
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: '소급 시작일 (YYYY-MM-DD)'
+        required: true
+      end_date:
+        description: '소급 종료일 (YYYY-MM-DD). 비우면 오늘까지'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 소급 조회
+        run: |
+          cd mtm-dashboard
+          if [ -n "${{ github.event.inputs.end_date }}" ]; then
+            python3 collect.py --backfill-macro "${{ github.event.inputs.start_date }}" --backfill-macro-end "${{ github.event.inputs.end_date }}"
+          else
+            python3 collect.py --backfill-macro "${{ github.event.inputs.start_date }}"
+          fi
+
+      - name: 결과 커밋 & push
+        run: |
+          git config user.name "mtm-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add mtm-dashboard/data/macro.csv
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+            exit 0
+          fi
+          git commit -m "매크로 지표 소급 백필 (${{ github.event.inputs.start_date }} ~ ${{ github.event.inputs.end_date }})"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push 실패 — main이 그새 움직임, rebase 후 재시도 ($i/5)"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 3))
+          done
+          echo "::error::5회 재시도 후에도 push 실패"
+          exit 1

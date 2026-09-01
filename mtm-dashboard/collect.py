@@ -124,8 +124,14 @@ MACRO_TICKERS = {
     'wti': ('CL=F', 1),
     'kospi': ('^KS11', 1),
     'kosdaq': ('^KQ11', 1),
+    'nasdaq': ('^IXIC', 1),
+    'nasdaq_futures': ('NQ=F', 1),
+    'sox': ('^SOX', 1),           # 필라델피아반도체지수 (SOXX는 이 지수를 추종하는 ETF, watchlist에 별도)
+    'usdkrw': ('USDKRW=X', 1),
+    'usdjpy': ('JPY=X', 1),
+    'gold': ('GC=F', 1),
 }
-MACRO_COLS = ['date', 'us10y', 'wti', 'kospi', 'kosdaq', 'source']
+MACRO_COLS = ['date'] + list(MACRO_TICKERS.keys()) + ['source']
 
 
 def load_macro(do_fetch, asof):
@@ -149,7 +155,7 @@ def load_macro(do_fetch, asof):
 def upsert_macro(date, values):
     rows = [r for r in read_csv('macro.csv') if r['date'] != date]
     row = {'date': date, 'source': 'live'}
-    for k in ('us10y', 'wti', 'kospi', 'kosdaq'):
+    for k in MACRO_TICKERS:
         v = values.get(k)
         row[k] = round(v, 4) if v is not None else ''
     rows.append(row)
@@ -315,6 +321,51 @@ def backfill_prices(start_date, end_date=None):
     all_rows.sort(key=lambda r: (r['date'], r['ticker']))
     write_csv('price_history.csv', all_rows, PRICE_HISTORY_COLS)
     print('과거 시세 %d행 추가 (price_history.csv 총 %d행)' % (len(new_rows), len(all_rows)))
+
+
+def backfill_macro(start_date, end_date=None):
+    """MACRO_TICKERS 전체를 야후에서 소급 조회해 macro.csv 를 채운다.
+    없는 날짜는 새 행을 만들고, 이미 있는 날짜는 **빈 칸인 항목만** 채운다
+    (예: 나중에 새 지표가 추가되기 전 날짜라 그 칸만 비어 있는 경우) —
+    이미 값이 있는 칸은 절대 덮어쓰지 않는다."""
+    end_date = end_date or datetime.date.today().isoformat()
+    existing = read_csv('macro.csv')
+    by_date = {r['date']: dict(r) for r in existing}
+
+    hist_by_key = {}
+    for key, (symbol, div) in MACRO_TICKERS.items():
+        try:
+            h = fetch_yahoo_history(symbol, start_date, end_date)
+            hist_by_key[key] = {d: v / div for d, v in h.items()}
+            print('  %-16s %d일치 조회' % (key, len(h)))
+        except Exception as e:
+            print('  실패: %s (%s)' % (key, str(e)[:80]))
+            hist_by_key[key] = {}
+
+    all_dates = set()
+    for h in hist_by_key.values():
+        all_dates |= set(h.keys())
+
+    added, filled = 0, 0
+    for d in sorted(all_dates):
+        if d not in by_date:
+            by_date[d] = {'date': d, 'source': 'backfill(yahoo)'}
+            for key in MACRO_TICKERS:
+                by_date[d][key] = ''
+            added += 1
+        row = by_date[d]
+        for key in MACRO_TICKERS:
+            if row.get(key) not in ('', None):
+                continue
+            v = hist_by_key.get(key, {}).get(d)
+            if v is not None:
+                row[key] = round(v, 4)
+                filled += 1
+
+    all_rows = sorted(by_date.values(), key=lambda r: r['date'])
+    write_csv('macro.csv', all_rows, MACRO_COLS)
+    print('과거 매크로: 새 날짜 %d행 추가, 기존 행 빈 칸 %d개 보완 (macro.csv 총 %d행)'
+          % (added, filled, len(all_rows)))
 
 
 def update_positions_current_price(prices):
@@ -559,14 +610,23 @@ def report(date, m, signals, failed, macro=None):
     print('\n  위반 %d건 / %d건' % (bad, len(signals)))
     if macro:
         print('\n━━━ 매크로 ' + '━' * (W - 10))
-        if 'us10y' in macro:
-            print('  미국채 10y금리         %19s' % ('%.2f%%' % macro['us10y']))
-        if 'wti' in macro:
-            print('  WTI 선물               %19s' % ('$%.2f' % macro['wti']))
-        if 'kospi' in macro:
-            print('  KOSPI                  %19s' % ('{:,.2f}'.format(macro['kospi'])))
-        if 'kosdaq' in macro:
-            print('  KOSDAQ                 %19s' % ('{:,.2f}'.format(macro['kosdaq'])))
+        MACRO_LABELS = [
+            ('kospi', 'KOSPI', '{:,.2f}'),
+            ('kosdaq', 'KOSDAQ', '{:,.2f}'),
+            ('nasdaq', 'NASDAQ', '{:,.2f}'),
+            ('nasdaq_futures', 'NASDAQ 선물', '{:,.2f}'),
+            ('sox', '필라델피아반도체(SOX)', '{:,.2f}'),
+            ('us10y', '미국채 10y금리', '%.2f%%'),
+            ('usdkrw', '원/달러 환율', '{:,.2f}'),
+            ('usdjpy', '엔/달러 환율', '{:,.2f}'),
+            ('wti', 'WTI 선물', '$%.2f'),
+            ('gold', 'GOLD', '$%.2f'),
+        ]
+        for key, label, fmt_str in MACRO_LABELS:
+            if key in macro:
+                val = macro[key]
+                shown = fmt_str % val if '%' in fmt_str else fmt_str.format(val)
+                print('  %-22s %19s' % (label, shown))
     if m['stop_at_cost']:
         print('  ※ %d종목은 손절가가 평단가와 동일 — 실손절가 미설정으로 간주해 R04에 포함,'
               % m['stop_at_cost'])
@@ -712,12 +772,17 @@ def main():
     ap.add_argument('--backfill-prices', metavar='START_DATE',
                     help='이 날짜부터 오늘까지 종목 종가를 야후에서 소급 조회 (예: 2026-08-01)')
     ap.add_argument('--backfill-prices-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
+    ap.add_argument('--backfill-macro', metavar='START_DATE',
+                    help='이 날짜부터 오늘까지 매크로 지표를 야후에서 소급 조회 (예: 2026-01-01)')
+    ap.add_argument('--backfill-macro-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
     a = ap.parse_args()
 
     if a.backfill:
         return backfill(a.backfill)
     if a.backfill_prices:
         return backfill_prices(a.backfill_prices, a.backfill_prices_end)
+    if a.backfill_macro:
+        return backfill_macro(a.backfill_macro, a.backfill_macro_end)
 
     date = a.date or datetime.date.today().isoformat()
     positions = read_csv('positions.csv')

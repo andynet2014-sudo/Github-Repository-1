@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """risk-console.html 에 박아넣는 DATA JSON 중 전체 이력 배열
-(full_pnl/full_eq/full_expo/full_credit/full_lev_real)만 다시 계산해서
-같은 파일 안의 값을 교체한다. 나머지 필드(metrics/signals/positions/trend/...)는
-건드리지 않는다 — CLAUDE.md '대시보드 반영 절차' 1~2단계에 해당.
+(full_pnl/full_eq/full_expo/full_credit/full_lev_real, 계좌별
+full_pnl_국장/full_pnl_미장/full_pnl_ISA)만 다시 계산해서 같은 파일 안의 값을
+교체한다. 나머지 필드(metrics/signals/positions/trend/...)는 건드리지 않는다 —
+CLAUDE.md '대시보드 반영 절차' 1~2단계에 해당.
 
 계산 방식은 collect.py 의 load_cashflow_totals() 와 동일한 원금 집계 로직을
 날짜별 누적으로 확장한 것이다: 그 날짜까지의 cashflow.csv principal 이동만 누적해서
@@ -51,9 +52,10 @@ def load_daily():
 
 
 def load_cashflow_principal_events():
-    """(date, account, signed_amount) 리스트 — 원금 이동에 해당하는 행만."""
+    """계좌별 (date, signed_amount) 리스트 — 원금 이동에 해당하는 행만.
+    {'국장': [...], '미장': [...], 'ISA': [...]} 형태로 반환한다."""
     path = os.path.join(DATA_DIR, 'cashflow.csv')
-    events = []
+    events = {acct: [] for acct in TRACKED}
     with open(path, encoding='utf-8') as f:
         rows = list(csv.DictReader(f))
     for r in rows:
@@ -61,10 +63,11 @@ def load_cashflow_principal_events():
             continue
         amt = num(r['amount']) or 0.0
         if r['from_account'] in TRACKED:
-            events.append((r['date'], r['from_account'], -amt))
+            events[r['from_account']].append((r['date'], -amt))
         if r['to_account'] in TRACKED:
-            events.append((r['date'], r['to_account'], amt))
-    events.sort(key=lambda e: e[0])
+            events[r['to_account']].append((r['date'], amt))
+    for acct in TRACKED:
+        events[acct].sort(key=lambda e: e[0])
     return events
 
 
@@ -87,30 +90,38 @@ def main():
     data = json.loads(html[i:j])
 
     daily = load_daily()
-    principal_events = load_cashflow_principal_events()
+    principal_events_by_acct = load_cashflow_principal_events()
 
     start = datetime.date(2025, 1, 1)
     end = datetime.datetime.strptime(data['date'], '%Y-%m-%d').date()
     dates = business_days(start, end)
 
     full_pnl, full_eq, full_expo, full_credit, full_lev_real = [], [], [], [], []
-    ev_idx = 0
-    principal_total = 0.0
+    full_pnl_acct = {acct: [] for acct in TRACKED}
+    ev_idx = {acct: 0 for acct in TRACKED}
+    principal_by_acct = {acct: 0.0 for acct in TRACKED}
     for d in dates:
-        while ev_idx < len(principal_events) and principal_events[ev_idx][0] <= d:
-            principal_total += principal_events[ev_idx][2]
-            ev_idx += 1
+        for acct in TRACKED:
+            events = principal_events_by_acct[acct]
+            while ev_idx[acct] < len(events) and events[ev_idx[acct]][0] <= d:
+                principal_by_acct[acct] += events[ev_idx[acct]][1]
+                ev_idx[acct] += 1
         row = daily.get(d)
         eq = num(row['equity']) if row else None
         credit = num(row['credit']) if row else None
         expo = num(row['expo_real']) if row else None
         lev = num(row['lev_real']) if row else None
+        principal_total = sum(principal_by_acct.values())
         pnl = (eq - principal_total) if eq is not None else None
         full_pnl.append({'date': d, 'v': pnl})
         full_eq.append({'date': d, 'v': eq})
         full_expo.append({'date': d, 'v': expo})
         full_credit.append({'date': d, 'v': credit})
         full_lev_real.append({'date': d, 'v': lev})
+        for acct in TRACKED:
+            acct_eq = num(row[acct + '_equity']) if row else None
+            acct_pnl = (acct_eq - principal_by_acct[acct]) if acct_eq is not None else None
+            full_pnl_acct[acct].append({'date': d, 'v': acct_pnl})
 
     n_pnl = sum(1 for p in full_pnl if p['v'] is not None)
     n_credit = sum(1 for p in full_credit if p['v'] is not None)
@@ -120,12 +131,18 @@ def main():
     n_pnl_y = sum(1 for p in full_pnl if p['date'].startswith(y) and p['v'] is not None)
     n_credit_y = sum(1 for p in full_credit if p['date'].startswith(y) and p['v'] is not None)
     print(f'{y}년만: full_pnl {n_pnl_y}개, full_credit {n_credit_y}개')
+    for acct in TRACKED:
+        n_acct = sum(1 for p in full_pnl_acct[acct] if p['v'] is not None)
+        print(f'{acct} full_pnl_acct 실값 {n_acct}개')
 
     data['full_pnl'] = full_pnl
     data['full_eq'] = full_eq
     data['full_expo'] = full_expo
     data['full_credit'] = full_credit
     data['full_lev_real'] = full_lev_real
+    data['full_pnl_국장'] = full_pnl_acct['국장']
+    data['full_pnl_미장'] = full_pnl_acct['미장']
+    data['full_pnl_ISA'] = full_pnl_acct['ISA']
 
     new_json = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
     new_html = html[:i] + new_json + html[j:]
