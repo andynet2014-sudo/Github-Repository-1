@@ -1,0 +1,41 @@
+name: TEST pykrx 투자자별 순매수 조회
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pykrx 설치
+        run: pip install pykrx
+
+      - name: 투자자별 순매수 테스트 (삼성전자/SK하이닉스/KOSPI, 8/27~8/31)
+        run: |
+          python3 <<'EOF'
+          from pykrx import stock
+          import pandas as pd
+          pd.set_option('display.max_columns', None)
+          pd.set_option('display.width', 200)
+
+          FROM, TO = '20260827', '20260831'
+
+          for name, code in [('삼성전자', '005930'), ('SK하이닉스', '000660')]:
+              print(f"\n=== {name}({code}) 투자자별 순매수대금 (detail=True, 기타법인 포함) ===")
+              try:
+                  df = stock.get_market_trading_value_by_date(FROM, TO, code, detail=True)
+                  print(df)
+              except Exception as e:
+                  print("에러:", e)
+
+          print("\n=== KOSPI 시장 전체 투자자별 순매수대금 ===")
+          try:
+              df = stock.get_market_trading_value_by_date(FROM, TO, market="KOSPI")
+              print(df)
+          except Exception as e:
+              print("에러:", e)
+          EOF
