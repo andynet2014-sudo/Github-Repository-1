@@ -47,7 +47,12 @@ def main(path):
 
     positions = collect.read_csv('positions.csv')
     common = {r['key']: r['value'] for r in collect.read_csv('common.csv')}
-    prices, _, _ = collect.load_prices(positions, False, '')
+    instruments = collect.instrument_list(positions)
+    prices, _, _ = collect.fetch_price_table(instruments, False, '')
+    for p in positions:                     # 현금/신용은 시장 시세가 없다 — 사람이 적은 값 그대로
+        if p['sector'] in collect.NONMARKET:
+            prices[p['ticker']] = (collect.num(p['current_price_krw'] or p['avg_price_krw']),
+                                   'manual(%s)' % p['sector'])
     mine, _ = collect.compute(positions, prices, common)
 
     print('%-26s %18s %18s   %s' % ('지표', '스프레드시트', 'collect.py', '판정'))
