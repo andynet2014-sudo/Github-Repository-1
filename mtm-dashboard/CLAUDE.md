@@ -160,10 +160,12 @@ Claude Code 세션 안에서만 가능해 GitHub Actions로는 못 함) — 사�
 라고 요청하면 그 시점의 최신 `risk-console.html`을 그대로 Artifact로 재배포한다.
 
 **투자자별 순매수**(`data/investor_flow_market.csv` 코스피 전체, `data/investor_flow_stock.csv`
-삼성전자·SK하이닉스)도 `collect.py` 정규 실행(main)에 자동 편입되어 매일 수집되지만,
-**대시보드(`risk-console.html`)에는 아직 주입 안 됨** — CSV에 쌓이기만 하고 화면에는
-안 보인다. 화면에 반영하려면 macro/stock 차트처럼 `dashboard/build_*.py` 스크립트를
-새로 만들어 `DATA`에 주입하는 작업이 별도로 필요하다(2026-09 기준 미착수).
+삼성전자·SK하이닉스)는 `collect.py` 정규 실행(main)에 자동 편입되어 매일 수집되고,
+**개별종목(삼전/SK하닉) 표는 `dashboard/build_investor_flow_table.py`가 매일 자동으로
+`risk-console.html`의 `DATA.investor_flow_stock`에 주입**해 각 종목 차트 카드 아래
+표로 뜬다(최근 10영업일 기본 노출, "더보기"로 최대 60영업일까지 펼쳐짐 — 2026-09
+추가). 코스피 시장 전체(`investor_flow_market.csv`)는 아직 대시보드에 주입 안 됨,
+필요해지면 같은 패턴으로 스크립트 추가.
 
 `dash_data.json`(메트릭/시그널/포지션 등 핵심 숫자)과 `DATA.stock_charts`(주가
 이동평균선)는 아직 자동화 안 됨 — `daily.csv`/`cashflow.csv`를 고치면 아래 순서를
@@ -189,6 +191,8 @@ Claude Code 세션 안에서만 가능해 GitHub Actions로는 못 함) — 사�
 
 - `DATA.stock_ai_summary` — View/Index 주가·이동평균선 카드 상단 AI 분석
 - `DATA.macro_ai_summary` — View/Index 매크로 지표 카드 상단 AI 분석
+- `DATA.investor_flow_ai_summary` — View/Index 개별종목 차트 섹션, 삼전/SK하닉 순매수
+  표 위 AI 분석 (2026-09 추가) — 최근 10영업일 기관/외국인 수급 방향을 근거로 작성
 - `DATA.view_summary` — Summ./View "이번 주 투자 기조" 상단 AI 요약
   (전문가 패널 카드형, `dashboard/build_view_log.py`로 `DATA.view_log`는
   자동 동기화되지만 `view_summary` 문장 자체는 여전히 수동 작성)
