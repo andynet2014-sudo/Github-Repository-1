@@ -1021,10 +1021,10 @@ const liqBreakdown =
   '<br>실질Exposure에 이미 2배 레버ETF·신용매수분이 배로 들어가 있음';
 
 const kpiDefs = [
-  ['계좌 순자산(대출포함)', FMT.n(m.equity) + '원',
+  ['계좌자산(대출포함/신용제외)', FMT.n(m.equity) + '원',
     '대출 ' + loanEok + '<br>원금(Equity) ' + pureprincipalEok + '<br>투자수익(세전) ' + profitEok,
     false, acctBreakdownHtml],
-  ['순수 자기자본 (세금 제외)', FMT.n(m.own_equity) + '원',
+  ['전재산(세전)', FMT.n(m.own_equity) + '원',
     '계좌 순자산 − 대출 ' + loanEok + '<br>세후 <b style="color:var(--ink)">' + FMT.n(m.own_equity - m.cum_tax_est) + '원</b>'],
   ['실질 Exposure', FMT.n(m.expo_real) + '원',
     '<b style="color:var(--ink)">전자 ' + FMT.eok(jeonjaExpo) + ' · 닉스 ' + FMT.eok(nixExpo) + '</b><br>레버ETF는 배율 반영해서 이미 실질값 — 명목잔고 ' + FMT.eok(m.lev_etf_nominal) + ' → 실질 ' + FMT.eok(levReal),
@@ -1033,9 +1033,9 @@ const kpiDefs = [
     '담보비율 ' + marginPct + (AS.credit ? '<br>최근 변동 ' + AS.credit : ''),
     false, kpiSparkHtml(DATA.full_credit, v => FMT.eok(v), '신용잔고')],
   ['레버리지 보유 잔고', FMT.n(m.lev_etf_nominal) + '원', levBd || ('순자산의 ' + FMT.pct(m.lev_etf_ratio))],
-  ['실질 레버리지', FMT.x(m.lev_real), 'Exposure ' + FMT.eok(m.expo_real) + '<br>÷ 자기자본 ' + FMT.eok(m.own_equity), m.lev_real > 5,
+  ['전재산 比 레버리지 배수', FMT.x(m.lev_real), 'Exposure ' + FMT.eok(m.expo_real) + '<br>÷ 자기자본 ' + FMT.eok(m.own_equity), m.lev_real > 5,
     kpiSparkHtml(DATA.full_lev_real, FMT.x, '실질 레버리지')],
-  ['청산까지 여력', '-' + FMT.pct(m.liq_room), liqBreakdown, m.liq_room < 0.10],
+  ['국장계좌 청산여력', '-' + FMT.pct(m.liq_room), liqBreakdown, m.liq_room < 0.10],
   ['현금 비중', FMT.pct(m.cash_ratio),
     '잔여 현금 ' + FMT.n(m.cash) + '원' + (AS.cash ? '<br>최근 변동 ' + AS.cash : ''), m.cash_ratio < 0.10],
   ['최대 섹터', FMT.pct(m.max_sector), m.max_sector_name, m.max_sector > 0.75, sectorDonutHtml(DATA.sector_rank)],
