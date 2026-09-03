@@ -38,7 +38,8 @@ from report import PCT, MULT, fmt, report
 from investor_flow import (INVESTOR_MARKET_KEYS, INVESTOR_MARKET_COLS, INVESTOR_STOCK_COLS,
                            STOCK_FLOW_TICKERS, fetch_investor_flow_market,
                            upsert_investor_flow_market, fetch_investor_flow_stock_recent,
-                           upsert_investor_flow_stock, collect_investor_flow)
+                           upsert_investor_flow_stock, collect_investor_flow,
+                           backfill_investor_flow)
 
 
 def load_cashflow_totals(common):
@@ -337,6 +338,9 @@ def main():
     ap.add_argument('--backfill-macro-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
     ap.add_argument('--investor-flow', metavar='DATE', nargs='?', const='today',
                     help='코스피 전체 + 삼전/SK하닉 투자자 순매수만 조회(단독 실행, 예: 2026-09-03)')
+    ap.add_argument('--backfill-investor-flow', metavar='START_DATE',
+                    help='이 날짜부터 오늘까지 코스피 전체+삼전/SK하닉 투자자 순매수 소급 조회 (예: 2026-01-01)')
+    ap.add_argument('--backfill-investor-flow-end', metavar='END_DATE', help='소급 조회 종료일 (기본: 오늘)')
     a = ap.parse_args()
 
     if a.backfill:
@@ -345,6 +349,8 @@ def main():
         return backfill_prices(a.backfill_prices, a.backfill_prices_end)
     if a.backfill_macro:
         return backfill_macro(a.backfill_macro, a.backfill_macro_end)
+    if a.backfill_investor_flow:
+        return backfill_investor_flow(a.backfill_investor_flow, a.backfill_investor_flow_end)
     if a.investor_flow:
         d = datetime.date.today().isoformat() if a.investor_flow == 'today' else a.investor_flow
         ok, failed = collect_investor_flow(d)

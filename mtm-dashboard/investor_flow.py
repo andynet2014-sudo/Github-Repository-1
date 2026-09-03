@@ -9,6 +9,7 @@
     KRX 공식 API는 로그인 세션 필요해서 막힘). 수량에 그날 종가를 곱해 금액으로
     환산해서 같이 저장한다.
 """
+import datetime
 import re
 
 from base import num, read_csv, write_csv, _get_text, _table_rows
@@ -78,6 +79,102 @@ def upsert_investor_flow_stock(rows):
         keep[key(row)] = row
     out = sorted(keep.values(), key=lambda r: (r['date'], r['ticker']))
     write_csv('investor_flow_stock.csv', out, INVESTOR_STOCK_COLS)
+
+
+def fetch_investor_flow_market_range(start_date, end_date=None):
+    """start_date~end_date 구간의 코스피 시장 전체 투자자 순매수를 조회.
+    bizdate 요청 한 번이 그 날짜 포함 최근 10거래일치를 돌려주는 걸 이용해
+    ~10거래일 간격으로 점프하며 요청 수를 최소화한다(전체 구간을 매일 따로
+    요청하지 않음). {date: {키: 값}} 반환."""
+    end_date = end_date or datetime.date.today().isoformat()
+    out = {}
+    cursor = end_date
+    seen = set()
+    while True:
+        bizdate = cursor.replace('-', '')
+        html = _get_text('https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate=' + bizdate)
+        tables = _table_rows(html, 'type_1')
+        if not tables or not tables[0]:
+            break
+        page_dates = []
+        for row in tables[0]:
+            if not re.match(r'\d{2}\.\d{2}\.\d{2}', row[0]) or len(row) < 11:
+                continue
+            d = '20' + row[0].replace('.', '-')
+            page_dates.append(d)
+            if start_date <= d <= end_date and d not in out:
+                vals = [num(c) for c in row[1:11]]
+                out[d] = dict(zip(INVESTOR_MARKET_KEYS, vals))
+        if not page_dates:
+            break
+        oldest = min(page_dates)
+        if oldest <= start_date or oldest in seen:
+            break
+        seen.add(oldest)
+        cursor = oldest
+    return out
+
+
+def fetch_investor_flow_stock_range(code, start_date, end_date=None):
+    """개별 종목의 start_date~end_date 구간 기관/외국인 순매매 수량(주)을
+    frgn.naver의 페이지네이션(&page=N, 페이지당 20거래일)으로 조회.
+    {date: {'price','기관_수량','외국인_수량'}} 반환."""
+    end_date = end_date or datetime.date.today().isoformat()
+    out = {}
+    page = 1
+    while page <= 60:   # 안전장치 — 60페이지(약 4.6년치)면 충분
+        html = _get_text('https://finance.naver.com/item/frgn.naver?code=%s&page=%d' % (code, page))
+        tables = _table_rows(html, 'type2')
+        if len(tables) < 2 or not tables[1]:
+            break
+        rows = [r for r in tables[1] if re.match(r'\d{4}\.\d{2}\.\d{2}', r[0]) and len(r) >= 7]
+        if not rows:
+            break
+        for row in rows:
+            d = row[0].replace('.', '-')
+            if start_date <= d <= end_date:
+                out[d] = {'price': num(row[1]), '기관_수량': num(row[5]), '외국인_수량': num(row[6])}
+        oldest = min(row[0].replace('.', '-') for row in rows)
+        if oldest < start_date:
+            break
+        page += 1
+    return out
+
+
+def backfill_investor_flow(start_date, end_date=None):
+    """start_date~end_date 구간을 소급 조회해 investor_flow_market.csv /
+    investor_flow_stock.csv 에 채운다. 이미 있는 (날짜) / (날짜,티커) 행은
+    덮어쓰지 않는다(실측/라이브 값 보존)."""
+    end_date = end_date or datetime.date.today().isoformat()
+    existing_market = {r['date'] for r in read_csv('investor_flow_market.csv')}
+    existing_stock = {(r['date'], r['ticker']) for r in read_csv('investor_flow_stock.csv')}
+
+    market_range = fetch_investor_flow_market_range(start_date, end_date)
+    added_market = 0
+    for d, vals in sorted(market_range.items()):
+        if d in existing_market:
+            continue
+        upsert_investor_flow_market(d, vals)
+        added_market += 1
+
+    added_stock = 0
+    for ticker, code in STOCK_FLOW_TICKERS.items():
+        name = '삼성전자' if code == '005930' else 'SK하이닉스'
+        stock_range = fetch_investor_flow_stock_range(code, start_date, end_date)
+        rows = []
+        for d, r in stock_range.items():
+            if (d, ticker) in existing_stock:
+                continue
+            price = r['price']
+            rows.append({'date': d, 'ticker': ticker, 'name': name, 'price': price,
+                        '기관_수량': r['기관_수량'], '외국인_수량': r['외국인_수량'],
+                        '기관_금액': round(r['기관_수량'] * price, 0),
+                        '외국인_금액': round(r['외국인_수량'] * price, 0)})
+        if rows:
+            upsert_investor_flow_stock(rows)
+            added_stock += len(rows)
+    print('투자자 순매수 소급 백필: 코스피 전체 %d행, 개별 종목 %d행 추가'
+          % (added_market, added_stock))
 
 
 def collect_investor_flow(date):

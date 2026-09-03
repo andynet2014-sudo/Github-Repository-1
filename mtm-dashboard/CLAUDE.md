@@ -159,6 +159,12 @@ main에 직접 push하다 충돌 나는 걸 막기 위한 장치이므로 완전
 Claude Code 세션 안에서만 가능해 GitHub Actions로는 못 함) — 사용자가 "배포해줘"
 라고 요청하면 그 시점의 최신 `risk-console.html`을 그대로 Artifact로 재배포한다.
 
+**투자자별 순매수**(`data/investor_flow_market.csv` 코스피 전체, `data/investor_flow_stock.csv`
+삼성전자·SK하이닉스)도 `collect.py` 정규 실행(main)에 자동 편입되어 매일 수집되지만,
+**대시보드(`risk-console.html`)에는 아직 주입 안 됨** — CSV에 쌓이기만 하고 화면에는
+안 보인다. 화면에 반영하려면 macro/stock 차트처럼 `dashboard/build_*.py` 스크립트를
+새로 만들어 `DATA`에 주입하는 작업이 별도로 필요하다(2026-09 기준 미착수).
+
 `dash_data.json`(메트릭/시그널/포지션 등 핵심 숫자)과 `DATA.stock_charts`(주가
 이동평균선)는 아직 자동화 안 됨 — `daily.csv`/`cashflow.csv`를 고치면 아래 순서를
 그대로 수동으로 거친다:

@@ -3,9 +3,12 @@ name: MtM 투자자 순매수 소급 백필
 on:
   workflow_dispatch:
     inputs:
-      dates:
-        description: '조회할 날짜들(쉼표구분, YYYY-MM-DD), 예: 2026-08-27,2026-08-28,2026-08-31'
+      start_date:
+        description: '소급 시작일 (YYYY-MM-DD)'
         required: true
+      end_date:
+        description: '소급 종료일 (YYYY-MM-DD). 비우면 오늘까지'
+        required: false
 
 permissions:
   contents: write
@@ -22,14 +25,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 날짜별 순차 조회
+      - name: 소급 조회 (코스피 전체 + 삼전/SK하닉)
         run: |
           cd mtm-dashboard
-          IFS=',' read -ra DATES <<< "${{ github.event.inputs.dates }}"
-          for d in "${DATES[@]}"; do
-            echo "=== $d ==="
-            python3 collect.py --investor-flow "$d" || true
-          done
+          if [ -n "${{ github.event.inputs.end_date }}" ]; then
+            python3 collect.py --backfill-investor-flow "${{ github.event.inputs.start_date }}" --backfill-investor-flow-end "${{ github.event.inputs.end_date }}"
+          else
+            python3 collect.py --backfill-investor-flow "${{ github.event.inputs.start_date }}"
+          fi
 
       - name: 결과 커밋 & push
         run: |
@@ -40,7 +43,7 @@ jobs:
             echo "변경 없음 — 커밋 생략"
             exit 0
           fi
-          git commit -m "투자자 순매수 소급 백필 (${{ github.event.inputs.dates }})"
+          git commit -m "투자자 순매수 소급 백필 (${{ github.event.inputs.start_date }} ~ ${{ github.event.inputs.end_date }})"
           for i in 1 2 3 4 5; do
             if git push; then
               exit 0
