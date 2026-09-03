@@ -1,0 +1,54 @@
+name: MtM 투자자 순매수 소급 백필
+
+on:
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: '조회할 날짜들(쉼표구분, YYYY-MM-DD), 예: 2026-08-27,2026-08-28,2026-08-31'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 날짜별 순차 조회
+        run: |
+          cd mtm-dashboard
+          IFS=',' read -ra DATES <<< "${{ github.event.inputs.dates }}"
+          for d in "${DATES[@]}"; do
+            echo "=== $d ==="
+            python3 collect.py --investor-flow "$d" || true
+          done
+
+      - name: 결과 커밋 & push
+        run: |
+          git config user.name "mtm-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add mtm-dashboard/data/investor_flow_market.csv mtm-dashboard/data/investor_flow_stock.csv
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋 생략"
+            exit 0
+          fi
+          git commit -m "투자자 순매수 소급 백필 (${{ github.event.inputs.dates }})"
+          for i in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "push 실패 — main이 그새 움직임, rebase 후 재시도 ($i/5)"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 3))
+          done
+          echo "::error::5회 재시도 후에도 push 실패"
+          exit 1
