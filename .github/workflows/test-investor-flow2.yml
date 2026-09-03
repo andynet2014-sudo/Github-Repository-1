@@ -7,26 +7,55 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: 개별 종목 기타법인 재탐색 (2차)
+      - name: integration 엔드포인트 전체 덤프 + investor 관련 키 탐색
         run: |
           python3 <<'EOF'
           import urllib.request, json
 
           headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
 
-          candidates = [
-              'https://m.stock.naver.com/api/stock/005930/integration',
-              'https://m.stock.naver.com/api/stock/005930/investors',
-              'https://api.stock.naver.com/stock/005930/integration',
-              'https://finance.daum.net/api/investor/days?symbolCode=A005930',
-              'https://finance.daum.net/api/quote/A005930/investors/days',
+          url = 'https://m.stock.naver.com/api/stock/005930/integration'
+          req = urllib.request.Request(url, headers=headers)
+          with urllib.request.urlopen(req, timeout=8) as r:
+              body = r.read()
+              d = json.loads(body)
+              print('TOP KEYS:', list(d.keys()))
+              for k in d.keys():
+                  v = d[k]
+                  if isinstance(v, (dict, list)):
+                      print(f'  {k}: {type(v).__name__} len={len(v)}')
+                  else:
+                      print(f'  {k}: {v!r}'[:150])
+
+          # investor 관련 키워드가 있는지 재귀 탐색
+          def find_keys(obj, path=''):
+              found = []
+              if isinstance(obj, dict):
+                  for k, v in obj.items():
+                      kl = str(k).lower()
+                      if 'invest' in kl or 'frgn' in kl or 'foreign' in kl or 'organ' in kl or 'corp' in kl:
+                          found.append(path + '/' + str(k))
+                      found.extend(find_keys(v, path + '/' + str(k)))
+              elif isinstance(obj, list):
+                  for i, item in enumerate(obj[:3]):
+                      found.extend(find_keys(item, path + f'[{i}]'))
+              return found
+
+          hits = find_keys(d)
+          print('\nINVESTOR-LIKE KEYS:', hits[:30])
+
+          # 다른 후보들도 확인
+          candidates2 = [
+              'https://m.stock.naver.com/api/stock/005930/investment',
+              'https://m.stock.naver.com/api/stock/005930/foreign',
+              'https://m.stock.naver.com/api/stock/005930/trend/investor',
           ]
-          for url in candidates:
-              req = urllib.request.Request(url, headers=headers)
+          for u2 in candidates2:
+              req2 = urllib.request.Request(u2, headers=headers)
               try:
-                  with urllib.request.urlopen(req, timeout=8) as r:
-                      body = r.read()
-                      print(f'{url}\n  -> status {r.status}, len {len(body)}, head: {body[:300]!r}\n')
+                  with urllib.request.urlopen(req2, timeout=8) as r2:
+                      b2 = r2.read()
+                      print(f'\n{u2}\n  -> status {r2.status}, len {len(b2)}, head: {b2[:200]!r}')
               except Exception as e:
-                  print(f'{url}\n  -> fail: {repr(e)}\n')
+                  print(f'\n{u2}\n  -> fail: {repr(e)}')
           EOF
