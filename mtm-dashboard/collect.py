@@ -131,24 +131,33 @@ MACRO_TICKERS = {
     'usdjpy': ('JPY=X', 1),
     'gold': ('GC=F', 1),
 }
-MACRO_COLS = ['date'] + list(MACRO_TICKERS.keys()) + ['source']
+MACRO_OHLC_SUFFIXES = ('_open', '_high', '_low')
+MACRO_COLS = (['date']
+              + [c for k in MACRO_TICKERS for c in [k] + [k + s for s in MACRO_OHLC_SUFFIXES]]
+              + ['source'])
 
 
 def load_macro(do_fetch, asof):
-    """매크로 지표를 야후에서 조회. 실패하면 macro.csv의 가장 최근 값으로 대체한다."""
+    """매크로 지표를 야후에서 조회(그날 OHLC 포함). 실패하면 macro.csv의 가장
+    최근 값으로 대체한다(이때는 종가만 채워지고 open/high/low는 빈 칸 —
+    나중에 --backfill-macro 로 채워진다)."""
     hist = read_csv('macro.csv')
     last = hist[-1] if hist else {}
     out, failed = {}, []
     for key, (symbol, div) in MACRO_TICKERS.items():
         if do_fetch:
             try:
-                v, _ = fetch_yahoo(symbol)
-                out[key] = v / div
+                today = fetch_yahoo_history(symbol, asof, asof)
+                ohlc = today.get(asof)
+                if ohlc is None:
+                    raise RuntimeError('오늘자 봉 없음')
+                out[key] = {'c': ohlc['c'] / div, 'o': ohlc['o'] / div,
+                           'h': ohlc['h'] / div, 'l': ohlc['l'] / div}
                 continue
             except Exception as e:
                 failed.append((symbol, str(e)[:60]))
         if key in last and last[key] not in ('', None):
-            out[key] = num(last[key])
+            out[key] = {'c': num(last[key])}
     return out, failed
 
 
@@ -156,8 +165,10 @@ def upsert_macro(date, values):
     rows = [r for r in read_csv('macro.csv') if r['date'] != date]
     row = {'date': date, 'source': 'live'}
     for k in MACRO_TICKERS:
-        v = values.get(k)
-        row[k] = round(v, 4) if v is not None else ''
+        v = values.get(k) or {}
+        row[k] = round(v['c'], 4) if v.get('c') is not None else ''
+        for suf, field in zip(MACRO_OHLC_SUFFIXES, ('o', 'h', 'l')):
+            row[k + suf] = round(v[field], 4) if v.get(field) is not None else ''
     rows.append(row)
     rows.sort(key=lambda r: r['date'])
     write_csv('macro.csv', rows, MACRO_COLS)
@@ -173,7 +184,9 @@ def upsert_macro(date, values):
 NONMARKET = ('현금', '신용')   # positions.csv 안에서 시세 조회 대상이 아닌 섹터
 
 PRICE_HISTORY_COLS = ['date', 'ticker', 'name', 'quote_symbol', 'quote_ccy',
-                      'price', 'price_krw', 'source']
+                      'price', 'price_krw', 'open', 'high', 'low', 'source']
+# open/high/low 는 price_krw 와 같은 통화(KRW 환산 완료)로 저장한다 — 캔들차트가
+# price_krw(종가)와 곧바로 같이 쓸 수 있도록. USD 종목도 그날의 fx로 환산해서 넣는다.
 
 
 def instrument_list(positions):
@@ -244,32 +257,41 @@ def upsert_price_history(date, rows):
 
 
 def fetch_yahoo_history(symbol, start, end):
-    """야후 차트 API의 일봉 구간 조회. {'YYYY-MM-DD': 종가} 반환."""
+    """야후 차트 API의 일봉 구간 조회. {'YYYY-MM-DD': {'o','h','l','c'}} 반환
+    (당일 진행 중인 마지막 봉은 h/l이 그 시점까지의 값이라 장중엔 계속 바뀔 수 있음 —
+    장 마감 후 재조회하면 확정값으로 덮인다). o/h/l이 없는(구버전 응답 등) 봉은
+    c 값으로 채워 넣어 최소한 종가 기준 라인은 항상 그릴 수 있게 한다."""
     period1 = int(datetime.datetime.strptime(start, '%Y-%m-%d').timestamp())
     period2 = int(datetime.datetime.strptime(end, '%Y-%m-%d').timestamp()) + 86400
     d = _get_json('https://query1.finance.yahoo.com/v8/finance/chart/%s'
                   '?period1=%d&period2=%d&interval=1d' % (symbol, period1, period2))
     result = d['chart']['result'][0]
     ts = result.get('timestamp') or []
-    closes = result['indicators']['quote'][0]['close']
+    quote = result['indicators']['quote'][0]
+    opens = quote.get('open') or [None] * len(ts)
+    highs = quote.get('high') or [None] * len(ts)
+    lows = quote.get('low') or [None] * len(ts)
+    closes = quote.get('close') or [None] * len(ts)
     out = {}
-    for t, c in zip(ts, closes):
+    for t, o, h, l, c in zip(ts, opens, highs, lows, closes):
         if c is None:
             continue
         day = datetime.datetime.utcfromtimestamp(t).strftime('%Y-%m-%d')
-        out[day] = c
+        out[day] = {'o': o if o is not None else c, 'h': h if h is not None else c,
+                    'l': l if l is not None else c, 'c': c}
     return out
 
 
 def backfill_prices(start_date, end_date=None):
-    """과거 구간의 일별 종가를 야후에서 소급 조회해 price_history.csv 에 채워 넣는다.
-    이미 있는 (날짜,티커) 조합은 건드리지 않는다 — 실측/라이브 값을 덮어쓰지 않기 위함.
-    국내 종목은 야후에 .KS/.KQ 로 걸려있어 둘 다 시도한다."""
+    """과거 구간의 일별 OHLC를 야후에서 소급 조회해 price_history.csv 에 채워 넣는다.
+    이미 있는 (날짜,티커) 행의 종가(price/price_krw)는 절대 덮어쓰지 않는다(실측/라이브
+    값 보존) — 다만 open/high/low가 비어 있으면(구버전 행, 라이브 수집 당시 조회 실패
+    등) 그 칸만 채워 넣는다. 국내 종목은 야후에 .KS/.KQ 로 걸려있어 둘 다 시도한다."""
     end_date = end_date or datetime.date.today().isoformat()
     positions = read_csv('positions.csv')
     instruments = instrument_list(positions)
     existing = read_csv('price_history.csv')
-    existing_keys = {(r['date'], r['ticker']) for r in existing}
+    existing_by_key = {(r['date'], r['ticker']): r for r in existing}
 
     fx_hist = {}
     if any(i['quote_ccy'] == 'USD' for i in instruments):
@@ -278,7 +300,7 @@ def backfill_prices(start_date, end_date=None):
         except Exception as e:
             print('  환율 이력 조회 실패: %s' % str(e)[:80])
 
-    new_rows = []
+    new_rows, patched = [], 0
     for i in instruments:
         t = i['ticker']
         try:
@@ -295,32 +317,47 @@ def backfill_prices(start_date, end_date=None):
                 if not hist:
                     print('  스킵(과거 시세 없음): %s' % t)
                     continue
-                for day, close in hist.items():
-                    if (day, t) in existing_keys:
+                for day, ohlc in hist.items():
+                    existing_row = existing_by_key.get((day, t))
+                    if existing_row is not None:
+                        if not existing_row.get('open'):
+                            existing_row['open'] = round(ohlc['o'], 4)
+                            existing_row['high'] = round(ohlc['h'], 4)
+                            existing_row['low'] = round(ohlc['l'], 4)
+                            patched += 1
                         continue
                     new_rows.append({'date': day, 'ticker': t, 'name': i['name'],
                                      'quote_symbol': i['quote_symbol'], 'quote_ccy': 'KRW',
-                                     'price': round(close, 4), 'price_krw': round(close, 4),
-                                     'source': 'backfill(yahoo%s)' % used})
+                                     'price': round(ohlc['c'], 4), 'price_krw': round(ohlc['c'], 4),
+                                     'open': round(ohlc['o'], 4), 'high': round(ohlc['h'], 4),
+                                     'low': round(ohlc['l'], 4), 'source': 'backfill(yahoo%s)' % used})
             else:
                 hist = fetch_yahoo_history(i['quote_symbol'], start_date, end_date)
-                for day, close in hist.items():
-                    if (day, t) in existing_keys:
+                for day, ohlc in hist.items():
+                    fx = fx_hist.get(day, {}).get('c') if fx_hist else None
+                    existing_row = existing_by_key.get((day, t))
+                    if existing_row is not None:
+                        if not existing_row.get('open') and fx is not None:
+                            existing_row['open'] = round(ohlc['o'] * fx, 4)
+                            existing_row['high'] = round(ohlc['h'] * fx, 4)
+                            existing_row['low'] = round(ohlc['l'] * fx, 4)
+                            patched += 1
                         continue
-                    fx = fx_hist.get(day)
                     if fx is None:
                         continue
                     new_rows.append({'date': day, 'ticker': t, 'name': i['name'],
                                      'quote_symbol': i['quote_symbol'], 'quote_ccy': 'USD',
-                                     'price': round(close, 4), 'price_krw': round(close * fx, 4),
-                                     'source': 'backfill(yahoo×fx)'})
+                                     'price': round(ohlc['c'], 4), 'price_krw': round(ohlc['c'] * fx, 4),
+                                     'open': round(ohlc['o'] * fx, 4), 'high': round(ohlc['h'] * fx, 4),
+                                     'low': round(ohlc['l'] * fx, 4), 'source': 'backfill(yahoo×fx)'})
         except Exception as e:
             print('  실패: %s (%s)' % (t, str(e)[:80]))
 
     all_rows = existing + new_rows
     all_rows.sort(key=lambda r: (r['date'], r['ticker']))
     write_csv('price_history.csv', all_rows, PRICE_HISTORY_COLS)
-    print('과거 시세 %d행 추가 (price_history.csv 총 %d행)' % (len(new_rows), len(all_rows)))
+    print('과거 시세 %d행 추가, 기존 %d행 open/high/low 보완 (price_history.csv 총 %d행)'
+          % (len(new_rows), patched, len(all_rows)))
 
 
 def backfill_macro(start_date, end_date=None):
@@ -336,7 +373,7 @@ def backfill_macro(start_date, end_date=None):
     for key, (symbol, div) in MACRO_TICKERS.items():
         try:
             h = fetch_yahoo_history(symbol, start_date, end_date)
-            hist_by_key[key] = {d: v / div for d, v in h.items()}
+            hist_by_key[key] = {d: {f: v / div for f, v in ohlc.items()} for d, ohlc in h.items()}
             print('  %-16s %d일치 조회' % (key, len(h)))
         except Exception as e:
             print('  실패: %s (%s)' % (key, str(e)[:80]))
@@ -352,15 +389,21 @@ def backfill_macro(start_date, end_date=None):
             by_date[d] = {'date': d, 'source': 'backfill(yahoo)'}
             for key in MACRO_TICKERS:
                 by_date[d][key] = ''
+                for suf in MACRO_OHLC_SUFFIXES:
+                    by_date[d][key + suf] = ''
             added += 1
         row = by_date[d]
         for key in MACRO_TICKERS:
-            if row.get(key) not in ('', None):
+            ohlc = hist_by_key.get(key, {}).get(d)
+            if ohlc is None:
                 continue
-            v = hist_by_key.get(key, {}).get(d)
-            if v is not None:
-                row[key] = round(v, 4)
+            if row.get(key) in ('', None):
+                row[key] = round(ohlc['c'], 4)
                 filled += 1
+            for suf, field in zip(MACRO_OHLC_SUFFIXES, ('o', 'h', 'l')):
+                if row.get(key + suf) in ('', None):
+                    row[key + suf] = round(ohlc[field], 4)
+                    filled += 1
 
     all_rows = sorted(by_date.values(), key=lambda r: r['date'])
     write_csv('macro.csv', all_rows, MACRO_COLS)
@@ -623,8 +666,8 @@ def report(date, m, signals, failed, macro=None):
             ('gold', 'GOLD', '$%.2f'),
         ]
         for key, label, fmt_str in MACRO_LABELS:
-            if key in macro:
-                val = macro[key]
+            if key in macro and macro[key].get('c') is not None:
+                val = macro[key]['c']
                 shown = fmt_str % val if '%' in fmt_str else fmt_str.format(val)
                 print('  %-22s %19s' % (label, shown))
     if m['stop_at_cost']:

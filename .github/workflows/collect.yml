@@ -62,11 +62,24 @@ jobs:
           cd mtm-dashboard
           python3 collect.py --date "${{ steps.date.outputs.target }}"
 
+      - name: 오늘자 캔들(open/high/low) 보완 (price_history.csv, macro.csv)
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          cd mtm-dashboard
+          python3 collect.py --backfill-prices "${{ steps.date.outputs.target }}" --backfill-prices-end "${{ steps.date.outputs.target }}"
+          python3 collect.py --backfill-macro "${{ steps.date.outputs.target }}" --backfill-macro-end "${{ steps.date.outputs.target }}"
+
       - name: 매크로 차트 데이터 대시보드에 주입 (data/macro.csv → risk-console.html)
         if: steps.skip.outputs.skip != 'true'
         run: |
           cd mtm-dashboard
           python3 dashboard/build_macro_chart.py
+
+      - name: 주가 캔들차트 데이터 대시보드에 주입 (data/price_history.csv → risk-console.html)
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          cd mtm-dashboard
+          python3 dashboard/build_stock_charts.py
 
       - name: 결과 커밋 & push
         run: |
