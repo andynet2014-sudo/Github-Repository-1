@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """data/investor_flow_stock.csv(자동 수집, 삼성전자/SK하이닉스 기관·외국인 순매매
-수량+금액)에서 종목별 최근 거래일 표를 risk-console.html 의 DATA.investor_flow_stock
-로 주입한다. 최근 10영업일은 기본 노출, 그 이전(최대 60영업일)은 "더보기"로 프론트에서
-펼쳐 보여준다 — 몇 개나 보여줄지는 프론트 로직이 결정하고, 여기서는 최대 60행만 넘긴다.
+수량+금액)에서 종목별 최근 거래일 "개인/외국인/기관" 순매수 금액 표를
+risk-console.html 의 DATA.investor_flow_stock 로 주입한다. 최근 10영업일은 기본
+노출, 그 이전(최대 60영업일)은 "더보기"로 프론트에서 펼쳐 보여준다.
+
+개별 종목 단위로는 네이버가 개인 순매수를 따로 안 주기 때문에(기관/외국인 수량만
+제공, 2026-09 조사 확인), 개인_금액은 -(기관_금액+외국인_금액) 잔여로 추정한다 —
+그날 총 거래대금이 개인/외국인/기관 세 주체로 대략 나뉜다고 가정한 근사치다(기타법인
+등 소수 주체 오차가 개인 쪽에 섞여 들어감). 원본 스크레이핑 값(기관/외국인)은
+data/investor_flow_stock.csv 에 그대로 있고, 이 잔여 추정은 표시용으로만 계산한다.
 
 data/investor_flow_stock.csv 는 collect.py 가 매일(GitHub Actions) 자동으로 채운다.
 
@@ -43,14 +49,20 @@ def main():
     for short, trows in by_ticker.items():
         trows.sort(key=lambda r: r['date'], reverse=True)   # 최신이 맨 앞
         trows = trows[:MAX_ROWS]
-        out[short] = [{
-            'date': r['date'],
-            'price': num(r['price']),
-            'organ_qty': num(r['기관_수량']),
-            'foreign_qty': num(r['외국인_수량']),
-            'organ_amt': num(r['기관_금액']),
-            'foreign_amt': num(r['외국인_금액']),
-        } for r in trows]
+        rows_out = []
+        for r in trows:
+            organ_amt = num(r['기관_금액'])
+            foreign_amt = num(r['외국인_금액'])
+            individual_amt = None
+            if organ_amt is not None and foreign_amt is not None:
+                individual_amt = -(organ_amt + foreign_amt)
+            rows_out.append({
+                'date': r['date'],
+                'individual_amt': individual_amt,
+                'foreign_amt': foreign_amt,
+                'organ_amt': organ_amt,
+            })
+        out[short] = rows_out
         print(f'{short}: {len(out[short])}일치 (최신 {out[short][0]["date"] if out[short] else "-"})')
 
     with open(HTML_PATH, encoding='utf-8') as f:
