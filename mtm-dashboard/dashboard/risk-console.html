@@ -483,6 +483,14 @@
   .panelcard .viewlog { margin-top: 8px; }
   .panelcard.mycard { border: 1.5px dashed var(--accent); background: var(--accent-soft); }
   .panelcard.mycard .panelcard-gist { border-left-color: var(--accent); color: var(--accent); }
+  .panelcard.mycard-full { width: 100%; margin-bottom: 10px; }
+  .ref-panel {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 10px;
+    padding-top: 9px; border-top: 1px dashed var(--border);
+  }
+  .ref-panel-label { font-size: 10.5px; color: var(--ink-muted); margin-right: 2px; }
+  .ref-panel-item { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-2); }
+  .ref-panel-item .stance-badge { font-size: 10px; padding: 1px 7px; }
 
   .journalrow { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .journalrow:last-child { border-bottom: none; }
@@ -540,7 +548,7 @@
 <div class="page">
 
   <header>
-    <p class="eyebrow">MtM Dashboard · 260731 · v1.11</p>
+    <p class="eyebrow">MtM Dashboard · 260731 · v1.12</p>
     <h1>MtM Dashboard</h1>
     <div class="subline">
       <span id="dateLabel"></span>
@@ -2279,30 +2287,40 @@ function bigChartFull(el, fullPts, fmt, opts) {
         ${foldHtml}
       </div>`;
   }
+  const refPanelHtml = people.length ? `
+    <div class="ref-panel">
+      <span class="ref-panel-label">(참고) 기타 전문가 뷰</span>
+      ${people.map(name => {
+        const latest = [...byPerson[name]].reverse()[0];
+        return `<span class="ref-panel-item"><b>${name}</b> <span class="stance-badge ${stanceClass(latest.stance)}">${latest.stance || '—'}${scoreTxt(latest)}</span></span>`;
+      }).join('')}
+    </div>` : '';
   function myCard() {
     const vs = DATA.view_status || {};
     const isUnset = (vs['상태'] || '').includes('미설정');
     if (isUnset) {
       return `
-        <div class="panelcard mycard">
+        <div class="panelcard mycard mycard-full">
           <div class="panelcard-head">
             <span class="panelcard-name">내 뷰</span>
             <span class="stance-badge neu">${vs['상태'] || '미설정'}</span>
           </div>
           <div class="panelcard-gist" style="opacity:.6;">아직 이번 주 내 기조를 확정하지 않았습니다 — 주말 갱신 루틴(W1)에서 정하세요.</div>
+          ${refPanelHtml}
         </div>`;
     }
     return `
-      <div class="panelcard mycard">
+      <div class="panelcard mycard mycard-full">
         <div class="panelcard-head">
           <span class="panelcard-name">내 뷰</span>
           <span class="stance-badge ${stanceClass(vs['상태'])}">${vs['상태'] || '—'}</span>
         </div>
         <div class="panelcard-gist">${vs['기조'] || ''}</div>
         <div class="comment">현재 레버ETF 비중: ${vs['현재레버ETF비중'] || '—'}</div>
+        ${refPanelHtml}
       </div>`;
   }
-  const cardsHtml = `<div class="panelcards">${myCard()}${people.map(personCard).join('')}</div>`;
+  const cardsHtml = `${myCard()}<div class="panelcards">${people.map(personCard).join('')}</div>`;
   const summaryHtml = DATA.view_summary ? `<div class="viewsummary"><b>AI 요약 —</b> ${DATA.view_summary}</div>` : '';
   document.getElementById('viewtracker').innerHTML = `
     <div class="empty">

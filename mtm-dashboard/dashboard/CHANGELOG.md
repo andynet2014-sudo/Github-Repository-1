@@ -4,6 +4,24 @@
 소스는 `dashboard/risk-console.html` — 수정 후 같은 URL로 재배포하고, 이 파일에 버전을 한 줄씩 추가한다.
 버전업은 요청 시점이 아니라 **실제로 코드 반영 + 재배포까지 끝난 시점**에 한다.
 
+## v1.12 — 2026-09-03
+"이번 주 투자 기조"를 전문가별 카드로 재구성, AI 요약 3종 최신화 + Ground Rule 추가.
+- 주가·매크로 캔들차트에 일봉/주봉/월봉 토글 추가(`aggregateCandles()`,
+  기존 1개월/3개월/12개월 기간 토글과 별도 축으로 조합 가능)
+- 뷰트래커를 사람별(김기훈/서재형/알상무/기타) 카드로 전환 — 카드마다
+  최신 Bull/Neutral/Bear 배지, 굵은 세로바로 강조한 "핵심 한 줄"(gist),
+  클릭하면 과거 기록 펼침. `data/viewtracker.csv`에 `gist` 컬럼 신설,
+  기존 16건 소급 작성
+- "내 뷰" 카드를 최상단 풀와이드로 추가(`DATA.view_status` 기반, 미설정 시
+  점선 placeholder) — 카드 안에 "(참고) 기타 전문가 뷰" 한 줄 요약(이름+배지)
+  포함, 김기훈/서재형/알상무는 그 아래 균일한 3열로 배치
+- 버그 수정: `DATA.view_log`를 `viewtracker.csv`에서 재생성하는 스크립트가
+  없어서 8/19 이후 신규 기록이 대시보드에 반영 안 되고 있었음 —
+  `dashboard/build_view_log.py` 신규 작성
+- CLAUDE.md에 "AI 요약/코멘트 박스는 배포 시점마다 최신 데이터로 재작성"
+  Ground Rule 추가(stock_ai_summary/macro_ai_summary/view_summary 3개
+  대상) — 이번 배포에서 3개 다 9/3 기준 최신 데이터로 재작성
+
 ## v1.11 — 2026-09-03
 View/Index의 주가·매크로 차트를 캔들차트(빨강=상승/파랑=하락)로 전환.
 - `collect.py`가 야후 차트 API에서 이미 받고 있던 open/high/low를 이제
