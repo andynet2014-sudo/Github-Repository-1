@@ -33,7 +33,8 @@ def main():
 
     view_log = [{
         'date': r['date'], 'source': r['source'], 'cycle': r['cycle'],
-        'stance': r['stance'], 'score': num(r['score']), 'comment': r['comment'],
+        'stance': r['stance'], 'score': num(r['score']),
+        'gist': r.get('gist') or None, 'comment': r['comment'],
         'keyword': r.get('keyword') or None, 'entry_via': r.get('entry_via') or None,
     } for r in rows]
 
