@@ -1,11 +1,13 @@
 name: MtM 일일 자동 수집
 
 on:
-  schedule:
-    - cron: '0 7 * * 1-5'    # KST 16:00 (평일) — 국장 마감
-    - cron: '20 7 * * 1-5'   # KST 16:20 백업 트리거 (GitHub Actions cron 미발동 대비)
-    - cron: '0 22 * * 1-5'   # KST 07:00 다음날 (평일 저녁 UTC) — 미장 마감
-    - cron: '20 22 * * 1-5'  # KST 07:20 다음날 백업 트리거
+  # 2026-09: 자체 cron 스케줄(schedule:)을 제거했다. 백업 cron까지 추가했는데도
+  # 2026-09-01~09-03 5일 연속 미발동/수시간 드리프트가 반복됐고(WORK_LOG.md 참고),
+  # 심지어 엉뚱한 시각에 발동해 개장 전 시세를 그날 종가로 잘못 캐싱한 사고까지
+  # 있었다 — GitHub Actions cron 자체를 신뢰할 수 없다고 판단. 대신 Claude Code
+  # Remote의 "MtM 종가 업데이트 확인" 체크인 루틴(하루 두 번, 국장/미장 마감 직후)이
+  # 매번 이 workflow_dispatch를 직접 호출하는 방식으로 트리거를 단일화했다 —
+  # 그 루틴은 지금까지 한 번도 안 빠지고 정확한 시각에 발동해왔다.
   workflow_dispatch:
     inputs:
       date:
