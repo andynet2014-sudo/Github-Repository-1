@@ -85,6 +85,12 @@ jobs:
           cd mtm-dashboard
           python3 dashboard/build_stock_charts.py
 
+      - name: 투자자 순매수 표 대시보드에 주입 (data/investor_flow_stock.csv → risk-console.html)
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          cd mtm-dashboard
+          python3 dashboard/build_investor_flow_table.py
+
       - name: 결과 커밋 & push
         run: |
           git config user.name "mtm-dashboard-bot"
