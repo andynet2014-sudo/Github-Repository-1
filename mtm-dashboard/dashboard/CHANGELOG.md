@@ -4,6 +4,22 @@
 소스는 `dashboard/risk-console.html` — 수정 후 같은 URL로 재배포하고, 이 파일에 버전을 한 줄씩 추가한다.
 버전업은 요청 시점이 아니라 **실제로 코드 반영 + 재배포까지 끝난 시점**에 한다.
 
+## v1.11 — 2026-09-03
+View/Index의 주가·매크로 차트를 캔들차트(빨강=상승/파랑=하락)로 전환.
+- `collect.py`가 야후 차트 API에서 이미 받고 있던 open/high/low를 이제
+  저장 — `fetch_yahoo_history()`가 종가만 뽑던 걸 OHLC 전체로 확장,
+  `price_history.csv`/`macro.csv`에 컬럼 추가(기존 종가값은 절대 덮어쓰지
+  않고 빈 open/high/low만 보완)
+- `collect.yml`(매일 자동수집)에 그날 OHLC 보완 스텝 + `build_stock_charts.py`
+  실행을 추가해 앞으로는 캔들 데이터가 자동으로 쌓임
+- `build_stock_charts.py`를 `data/price_history.csv`(자동 수집, OHLC 포함)
+  기준으로 전환하되, 기존 `dashboard/price_history.csv`(2025-11~ 수동
+  1회성 종가)를 더 이전 구간 보완용으로 병합 — 9개월 이력 유지
+- `stockChartSVG()`에 `candle` 옵션 추가(몸통+꼬리), OHLC 없는 구간은
+  자동으로 기존 라인차트로 폴백. 호버 툴팁에 시/고/저/종 표시
+- `backfill-prices.yml`/`backfill-macro.yml`을 2026-01-02부터 재실행해
+  전자·닉스 164일치, 매크로 10종 전체를 실제 캔들로 채움
+
 ## v1.10 — 2026-09-03
 Summ. 탭 히어로 확장 — 전일比 종목별 요인, 최근 2주/월별 손익 추이 미니차트, KPI 카드 제목 4개 변경.
 - 표면 누적손익 아래 "전일比 요인" 칩 추가 — `dashboard/build_dod_breakdown.py`가
