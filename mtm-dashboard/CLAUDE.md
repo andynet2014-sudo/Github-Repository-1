@@ -156,7 +156,18 @@ main에 직접 push하다 충돌 나는 걸 막기 위한 장치이므로 완전
 
 ## 대시보드(아티팩트) 반영 절차
 
-`daily.csv`/`cashflow.csv`를 고치면 반드시 이 순서를 지킨다:
+**2026-09 갱신: 매크로 차트(`DATA.macro_series`)만 자동화됨.** `collect.yml`이
+`collect.py` 실행 직후 `dashboard/build_macro_chart.py`를 이어서 실행해
+`data/macro.csv`(미국채10y·WTI·KOSPI·코스닥·NASDAQ·SOX·환율·금 등)를 매일
+`risk-console.html`의 `DATA.macro_series`에 자동 주입하고 커밋한다 — 이 부분은
+더 이상 수동으로 안 해도 됨. 단, **이렇게 리포에 커밋된 `risk-console.html`이
+실제 라이브 Artifact URL로 재배포되는 것은 여전히 수동**이다(Artifact 배포는
+Claude Code 세션 안에서만 가능해 GitHub Actions로는 못 함) — 사용자가 "배포해줘"
+라고 요청하면 그 시점의 최신 `risk-console.html`을 그대로 Artifact로 재배포한다.
+
+`dash_data.json`(메트릭/시그널/포지션 등 핵심 숫자)과 `DATA.stock_charts`(주가
+이동평균선)는 아직 자동화 안 됨 — `daily.csv`/`cashflow.csv`를 고치면 아래 순서를
+그대로 수동으로 거친다:
 
 1. rebuild 스크립트로 `dash_data.json` 재생성 (`collect.py`의 `compute()` 등을 재사용)
 2. `risk-console.html`의 `const DATA = {...}` 블록에 새 JSON 주입
