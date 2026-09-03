@@ -4,6 +4,35 @@
 소스는 `dashboard/risk-console.html` — 수정 후 같은 URL로 재배포하고, 이 파일에 버전을 한 줄씩 추가한다.
 버전업은 요청 시점이 아니라 **실제로 코드 반영 + 재배포까지 끝난 시점**에 한다.
 
+## v1.13 — 2026-09-03
+Priority 섹션 신설, View 차트·전문가 카드 대폭 개선, Cashflow 계좌별 표,
+감정(공포·탐욕) 기록 신설 — v1.12 이후 누적분 일괄 배포.
+- **Summ.**: "Priority" 섹션 신설(루틴·원칙·계획·룩백 4카드) —
+  `data/priority.csv`/`dashboard/build_priority.py`로 관리, 채팅으로 계속
+  채워나가는 방식. 루틴에 4개 세부 항목(방송 청취+Opus 소화, 장전 루틴,
+  리포트+텔레그램 검토, 유튜브 정리) 반영
+- **View/Index**: "주가·이동평균선" → "개별종목 차트"로 개명·자동 데일리
+  수집으로 캡션 갱신. 전문가 카드 본문에 "장전:/장후:/오전:/오후:" 등
+  세션 구분자 강조 배지 + 줄바꿈 보존 + 폰트 확대. 개별종목·매크로 차트
+  모두 캔들 호버 시 전일比 %변화 툴팁 표시. 코스닥은 화면에서만 제외
+  (수집은 계속). 차트 카드 좌상단 "⠿" 드래그 핸들로 순서 변경(데스크톱
+  HTML5 DnD + 모바일 터치 둘 다 지원, 뷰어 localStorage에 저장). 매크로
+  지표에도 MA20(빨강)/MA60(초록)/MA120(보라) + 볼린저밴드(연한 노랑) 추가.
+  양봉/음봉 범례 제거
+- **Cashflow**: "현금흐름 요약"(기존 그래프+월별표)과 "계좌별 원금 이동
+  내역"(신규 표: 변경일시 | 국장 | 미장 | ISA)으로 분리. 표는 값과
+  증감액을 두 줄로 표기(예: `360,000,000원` / `(+5,000,000원)`)
+- **Lookback**: "감정 기록" 카드 신규 — `data/emotion.csv`(-5 극도의 공포
+  ~ +5 극도의 탐욕)를 `dashboard/build_emotion.py`로 주입, 추이 그래프로
+  시각화(양극단 빨강·중립 회색). 아직 실제 데이터 없이 빈 상태로 배포
+- 버그 수정: `DATA.view_log`가 `viewtracker.csv` 최신 반영 안 되던 문제
+  (`dashboard/build_view_log.py` 신규), `viewtracker.csv`에 `gist`(핵심
+  한 줄) 컬럼 추가
+- `stockChartSVG()`에 `opts.band`(볼린저밴드 채우기) 지원 추가,
+  `miniPnlChartSVG()`에 `opts.colorFn`(점별 색상) 추가
+- CLAUDE.md에 "AI 요약 박스는 배포 시점마다 최신 데이터로 재작성" Ground
+  Rule 추가 — stock_ai_summary/macro_ai_summary/view_summary 최신 확인
+
 ## v1.12 — 2026-09-03
 "이번 주 투자 기조"를 전문가별 카드로 재구성, AI 요약 3종 최신화 + Ground Rule 추가.
 - 주가·매크로 캔들차트에 일봉/주봉/월봉 토글 추가(`aggregateCandles()`,
