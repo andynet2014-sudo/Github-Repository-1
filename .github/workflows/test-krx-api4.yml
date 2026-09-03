@@ -1,0 +1,37 @@
+name: TEST KRX API 재신청 후 재확인
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 신청 후 엔드포인트 재확인
+        env:
+          KRX_KEY: ${{ secrets.KRX_MARKETPLACE_API }}
+        run: |
+          python3 <<'EOF'
+          import urllib.request, urllib.error, os
+
+          key = os.environ['KRX_KEY'].strip()
+          print('key length:', len(key), 'ascii:', key.isascii())
+          headers = {'AUTH_KEY': key}
+
+          candidates = [
+              'http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd?basDd=20260903',
+              'http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd?basDd=20260903',
+              'http://data-dbg.krx.co.kr/svc/apis/sto/ksq_bydd_trd?basDd=20260903',
+          ]
+          for url in candidates:
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=10) as r:
+                      body = r.read()
+                      print(f'{url}\n  -> status {r.status}, len {len(body)}, head: {body[:500]!r}\n')
+              except urllib.error.HTTPError as e:
+                  err_body = e.read()[:300]
+                  print(f'{url}\n  -> HTTPError {e.code}: {e.reason}, body: {err_body!r}\n')
+              except Exception as e:
+                  print(f'{url}\n  -> fail: {repr(e)}\n')
+          EOF
