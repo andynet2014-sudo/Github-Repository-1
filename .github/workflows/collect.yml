@@ -62,11 +62,17 @@ jobs:
           cd mtm-dashboard
           python3 collect.py --date "${{ steps.date.outputs.target }}"
 
+      - name: 매크로 차트 데이터 대시보드에 주입 (data/macro.csv → risk-console.html)
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          cd mtm-dashboard
+          python3 dashboard/build_macro_chart.py
+
       - name: 결과 커밋 & push
         run: |
           git config user.name "mtm-dashboard-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add mtm-dashboard/data
+          git add mtm-dashboard/data mtm-dashboard/dashboard/risk-console.html
           if git diff --cached --quiet; then
             echo "변경 없음 — 커밋 생략"
             exit 0
