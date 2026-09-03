@@ -182,3 +182,16 @@
 - 결과: `investor_flow_market.csv` 165거래일, `investor_flow_stock.csv` 330행
   (삼성전자+SK하이닉스 × 165일) 확보.
 - 상태: 완료.
+
+### 2026-09-04 (KST) — main (대시보드: 투자자 순매수 표 추가 + KRX API 키 점검)
+- 삼전/SK하닉 개별종목 차트 카드 하단에 주체별(기관/외국인) 순매매 수량·금액 표 추가
+  (기본 최근 10영업일 노출, "더보기"로 최대 60영업일까지 펼침), 표 위에 AI 분석 1~2줄.
+  `dashboard/build_investor_flow_table.py` 신설, collect.yml에 매일 자동 실행 편입 —
+  이제 배포 시마다(그리고 매일 자동 갱신 시마다) 최신 데이터 반영됨.
+  jsdom 콘솔 에러 0건, Playwright 라이트/다크 스크린샷 확인, 더보기 토글 동작 확인,
+  같은 아티팩트 URL로 재배포 완료.
+- 투자자 순매수 2026-01-01~오늘 전체 백필 완료(전날 range 백필 로직으로 39초 소요).
+- KRX_MARKETPLACE_API 시크릿 등록 확인(길이 105) — 그러나 AUTH_KEY 헤더로 KRX Open API
+  호출 시 UnicodeEncodeError('latin-1', ...) 발생, 값에 비ASCII 문자가 섞여 있는 것으로
+  보임(승인 대기중 상태라 아직 정식 키가 아닐 가능성). 사용자에게 재확인 요청함.
+- 상태: 대시보드 기능 완료. KRX API 연동은 키 재확인 대기 중.
