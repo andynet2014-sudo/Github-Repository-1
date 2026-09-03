@@ -153,3 +153,24 @@
   QQQ $717.67, SOXX $502.20, EWY $180.56.
 - 상태: 완료. 6일 연속 스케줄 미발동/오정렬 지속 — 트리거 방식 재검토를 사용자에게
   다시 상기.
+
+### 2026-09-04 (KST) — main (기능 추가: 투자자별 순매수 + 트리거 정리)
+- **투자자별 순매수 추적 기능 추가** (`collect.py`):
+  - 코스피 시장 전체: 개인/외국인/기관계/기관세부(6종)/기타법인 순매수 스크레이핑
+    (`finance.naver.com/sise/investorDealTrendDay.naver`) → `data/investor_flow_market.csv`
+  - 삼성전자·SK하이닉스: 기관/외국인 순매매 수량(주) 스크레이핑
+    (`finance.naver.com/item/frgn.naver`) → 종가 곱해 금액 환산 →
+    `data/investor_flow_stock.csv`
+  - collect.py 정규 실행(main)에 자동 편입, 실패해도 본 수집은 막지 않음.
+    `--investor-flow DATE` 로 단독 실행도 가능. `backfill-investor-flow.yml`로 소급 백필.
+  - **개별 종목 기타법인(자사주매입 프록시) 분리는 재조사로도 무료 소스 없음 재확인**
+    (m.stock.naver.com integration API도 기관/외국인 수량만 있고 기타법인 없음,
+    KRX 공식 API만 가능하나 로그인 세션 필요) — 코스피 시장 전체 기타법인 추이로 대체.
+  - 8/27~9/3 6영업일 백필 완료, 값 검증(기관계 = 세부합, 매수+매도 합 ≈ 0 확인).
+- **트리거 방식 정리**: `collect.yml`의 자체 cron 스케줄(백업 포함 4개) 전부 제거 —
+  9/1~9/3 반복된 미발동/드리프트/오정렬을 cron 추가로도 못 고쳐서 GitHub Actions
+  cron 자체를 신뢰 불가로 판단. 대신 하루 두 번 도는 체크인 루틴(국장/미장 마감 후)이
+  매번 무조건 workflow_dispatch를 직접 호출하도록 두 루틴 프롬프트 갱신 — 그 루틴은
+  지금까지 한 번도 안 빠지고 정확한 시각에 발동해왔음. workflow_dispatch는 그대로
+  유지되어 수동 실행도 가능.
+- 상태: 완료.
