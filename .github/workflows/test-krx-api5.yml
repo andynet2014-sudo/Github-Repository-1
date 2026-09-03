@@ -1,0 +1,44 @@
+name: TEST KRX 투자자별 거래실적 엔드포인트 탐색
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 투자자별 엔드포인트 후보 탐색
+        env:
+          KRX_KEY: ${{ secrets.KRX_MARKETPLACE_API }}
+        run: |
+          python3 <<'EOF'
+          import urllib.request, urllib.error, os
+
+          key = os.environ['KRX_KEY'].strip()
+          headers = {'AUTH_KEY': key}
+
+          candidates = [
+              'sto/stk_invsto_trd_trend',
+              'sto/invsto_trd_trend',
+              'sto/stk_invstr_trd',
+              'sto/investor_trd',
+              'sto/stk_invsto_trd_ntsl',
+              'sto/stk_invsto_stat',
+              'sto/invsto_trd_by_date',
+              'inv/stk_invsto_trd',
+              'inv/investor_trd_trend',
+              'sto/stk_invsto',
+          ]
+          for path in candidates:
+              url = f'http://data-dbg.krx.co.kr/svc/apis/{path}?basDd=20260903'
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=8) as r:
+                      body = r.read()
+                      print(f'{path}\n  -> status {r.status}, len {len(body)}, head: {body[:300]!r}\n')
+              except urllib.error.HTTPError as e:
+                  err_body = e.read()[:200]
+                  print(f'{path}\n  -> {e.code}: {err_body!r}\n')
+              except Exception as e:
+                  print(f'{path}\n  -> fail: {repr(e)}\n')
+          EOF
