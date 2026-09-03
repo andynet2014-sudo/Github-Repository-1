@@ -62,11 +62,16 @@ def fetch_yahoo_history(symbol, start, end):
     closes = quote.get('close') or [None] * len(ts)
     out = {}
     for t, o, h, l, c in zip(ts, opens, highs, lows, closes):
-        if c is None:
+        # 장 시작 전/미확정 봉은 o/h/l/c가 전부 0으로 오는 경우가 있다(야후 응답
+        # 자체의 placeholder) — 0 이하는 결측과 동일하게 취급해 그날 캔들이
+        # 0으로 찍히는 걸 막는다.
+        if c is None or c <= 0:
             continue
         day = datetime.datetime.utcfromtimestamp(t).strftime('%Y-%m-%d')
-        out[day] = {'o': o if o is not None else c, 'h': h if h is not None else c,
-                    'l': l if l is not None else c, 'c': c}
+        o = o if (o is not None and o > 0) else c
+        h = h if (h is not None and h > 0) else c
+        l = l if (l is not None and l > 0) else c
+        out[day] = {'o': o, 'h': h, 'l': l, 'c': c}
     return out
 
 
