@@ -1,0 +1,61 @@
+name: TEST 투자자별 순매수 파서 검증
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 시장 전체(코스피) + 개별종목 파서 검증
+        run: |
+          python3 <<'EOF'
+          import urllib.request, re
+
+          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+
+          def get(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=10) as r:
+                  return r.read().decode('euc-kr', errors='replace')
+
+          def parse_market_day(bizdate):
+              url = f'https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate={bizdate}'
+              html = get(url)
+              tables = re.findall(r'<table[^>]*class="type_1"[^>]*>(.*?)</table>', html, re.S)
+              if not tables:
+                  tables = re.findall(r'<table[^>]*>(.*?)</table>', html, re.S)
+              print(f'[{bizdate}] tables found: {len(tables)}')
+              for ti, t in enumerate(tables):
+                  rows = re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S)
+                  for row in rows:
+                      cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+                      cells = [re.sub('<[^>]+>', '', c).strip() for c in cells]
+                      cells = [c for c in cells if c]
+                      if cells and re.match(r'\d{2}\.\d{2}\.\d{2}', cells[0]):
+                          print(f'  table{ti} row:', cells)
+
+          for bd in ['20260903', '20260902', '20260827']:
+              parse_market_day(bd)
+
+          def parse_stock(code):
+              url = f'https://finance.naver.com/item/frgn.naver?code={code}'
+              html = get(url)
+              tables = re.findall(r'<table[^>]*class="type2"[^>]*>(.*?)</table>', html, re.S)
+              print(f'\n[{code}] type2 tables found: {len(tables)}')
+              for ti, t in enumerate(tables):
+                  rows = re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S)
+                  count = 0
+                  for row in rows:
+                      cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+                      cells = [re.sub('<[^>]+>', '', c).strip() for c in cells]
+                      cells = [c for c in cells if c]
+                      if cells and re.match(r'\d{4}\.\d{2}\.\d{2}', cells[0]):
+                          print(f'  table{ti} row:', cells)
+                          count += 1
+                          if count >= 5:
+                              break
+
+          for code in ['005930', '000660']:
+              parse_stock(code)
+          EOF
