@@ -192,10 +192,16 @@ def main():
                     'expo_real': m['expo_real'], 'credit': m['credit']}
     d['series'] = prev['series'] + [series_point]
 
-    for key, val in (('full_pnl', m['net_pnl']), ('full_eq', m['equity']),
+    for key, val in (('full_pnl', m['surface_pnl']), ('full_eq', m['equity']),
+                     ('full_own', m['own_equity']),
                      ('full_expo', m['expo_real']), ('full_credit', m['credit']),
                      ('full_lev_real', m['lev_real'])):
-        d[key] = prev[key] + [{'date': a.date, 'v': val}]
+        series_full = list(prev.get(key, []))
+        if series_full and series_full[-1]['date'] == a.date:
+            series_full[-1] = {'date': a.date, 'v': val}
+        else:
+            series_full.append({'date': a.date, 'v': val})
+        d[key] = series_full
 
     month = a.date[:7]
     monthly = list(prev['monthly'])
