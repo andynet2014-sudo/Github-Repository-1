@@ -1,0 +1,47 @@
+name: TEST 대체 무료 소스 재확인 (Referer 헤더 포함)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Daum 등 재시도 + 추가 후보
+        run: |
+          python3 <<'EOF'
+          import urllib.request
+
+          def get(url, referer=None):
+              headers = {
+                  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+                  'Accept': 'application/json, text/plain, */*',
+              }
+              if referer:
+                  headers['Referer'] = referer
+              req = urllib.request.Request(url, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=8) as r:
+                      body = r.read()
+                      return r.status, len(body), body[:300]
+              except urllib.error.HTTPError as e:
+                  return e.code, 0, e.read()[:200]
+              except Exception as e:
+                  return None, 0, repr(e).encode()
+
+          candidates = [
+              ('https://finance.daum.net/api/investor/days?symbolCode=A005930&page=1&perPage=10',
+               'https://finance.daum.net/domestic/all'),
+              ('https://finance.daum.net/api/quotes/A005930/investors/days?page=1&perPage=10',
+               'https://finance.daum.net/quotes/A005930'),
+              ('https://finance.daum.net/api/quote/A005930/investors/days?page=1&perPage=10',
+               'https://finance.daum.net/quotes/A005930'),
+              ('https://comp.fnguide.com/SVO2/ASP/SVD_Invest.asp?pGB=1&gicode=A005930',
+               None),
+              ('https://www.alphasquare.co.kr/home/api/market/investor-trend?code=005930',
+               'https://www.alphasquare.co.kr'),
+          ]
+          for url, ref in candidates:
+              status, ln, head = get(url, ref)
+              print(f'{url}\n  ref={ref}\n  -> status {status}, len {ln}, head: {head!r}\n')
+          EOF
