@@ -1,0 +1,23 @@
+name: TEST FnGuide 투자자 페이지 내용 확인
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: FnGuide SVD_Invest 페이지 전체 확인
+        run: |
+          python3 <<'EOF'
+          import urllib.request
+
+          headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+          url = 'https://comp.fnguide.com/SVO2/ASP/SVD_Invest.asp?pGB=1&gicode=A005930'
+          req = urllib.request.Request(url, headers=headers)
+          with urllib.request.urlopen(req, timeout=10) as r:
+              body = r.read().decode('utf-8', errors='replace')
+          print('length:', len(body))
+          print('기타법인' in body, '외국인' in body, '기관' in body)
+          print(body[:3000])
+          EOF
