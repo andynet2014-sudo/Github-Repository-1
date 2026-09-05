@@ -141,6 +141,13 @@ python3 export_to_xlsx.py --date YYYY-MM-DD
 이 절차나 CLAUDE.md의 규칙 자체를 바꾸는 작업이라면, CLAUDE.md와 짝을 이루는
 운영 가이드 아티팩트(URL도 CLAUDE.md에 있음)도 같이 갱신하고 버전을 올린다.
 
+**과거 날짜를 소급 수정했거나(백필·정정), 전일比 요인 칩이 갱신 안 됐다면**
+`dashboard/build_full_history.py`와 `dashboard/build_dod_breakdown.py`도 함께
+돌린다 — 둘 다 `risk-console.html`의 DATA를 직접 읽어 해당 부분만 패치하는
+스크립트다. `build_dash_data.py`는 최신 날짜 포인트 하나만 append하므로, 중간
+날짜를 고치거나 전일 비교 대상이 바뀌면 이 두 스크립트로 다시 계산해야
+`누적손익 추이`/`전일比 요인` 칩이 최신 데이터와 어긋나지 않는다.
+
 ## 5. 커밋
 
 - `CLAUDE.md`에 따르면 검증 없이 큰 변경(계산 공식 변경, 대량 백필, 스키마 변경)은
