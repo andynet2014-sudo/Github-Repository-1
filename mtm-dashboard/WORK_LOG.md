@@ -245,3 +245,16 @@
   반영(OHLC 포함, source=yahoo — 캐시 아님): SOXL $117.28, SKHY $177.00, MU $1016.59,
   QQQ $718.96, SOXX $519.86, EWY $188.87.
 - 상태: 완료, 문제 없음. 2일 연속 새 트리거 방식 정상 작동.
+
+### 2026-09-05 (KST) — main (개별종목 기타법인 무료 소스 3차 탐색 — 최종 결론)
+- 사용자가 KRX 유료 가격표(투자자별 거래실적: 1일단위 5만원/월, 10분단위 10만원/월,
+  1분단위 15만원/월) 확인 후 무료 대안 재문의 → 추가 소스 3종 재탐색:
+  - Daum(`finance.daum.net/api/investor/days`, Referer 헤더로 403 우회 성공): 응답은
+    오지만 필드가 `foreignStraightPurchaseVolume`/`institutionStraightPurchaseVolume`
+    뿐 — 네이버와 동일하게 기관/외국인 수량만, 기타법인 없음.
+  - FnGuide 구버전(`comp.fnguide.com/SVO2/...`): 서비스 자체가 폐기되어 "페이지가
+    없습니다"(신버전 wcomp.fnguide.com으로 이전, 추가 조사 안 함).
+  - AlphaSquare: API가 아니라 SPA HTML만 반환, 정적 파싱 불가.
+- **최종 결론**: 개별 종목 기타법인(자사주매입 프록시) 데이터는 네이버·다음·구버전
+  FnGuide 등 무료 경로를 3차례에 걸쳐 전부 확인했으나 어디에도 없음 — KRX 유료 API가
+  사실상 유일한 경로로 최종 확인됨. 사용자에게 구독 여부 판단 요청.
